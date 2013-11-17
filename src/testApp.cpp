@@ -6,37 +6,58 @@ void testApp::setup(){
     
 	drawGrid = true;
     bWireframe = false;
+    bInvertSelection = true;
     scale = 1;
     
 	mc.setSmoothing( false );
     for(int i=0; i<13; i++){
         ofImage img;
-        img.loadImage("Images/"+ofToString(i)+".png");
+        img.loadImage("Images/hands/"+ofToString(i)+".png");
         imgs.push_back(img);
         
     }
+    updateResolution();
+
+	mc.scale.set( 500, 250, 500 );
     
+    bTriangulate = false;
+    triResX=2;
+    triResY=2;
+    triResZ=100;
+    
+    setupGUI();
+
+    //    ofLog(OF_LOG_VERBOSE);
+}
+void testApp::updateResolution(){
     float x= imgs[0].getWidth()/32;
     float y = imgs[0].getHeight()/32;
     mc.setup();
 	mc.setResolution(x,y,32);
-	mc.scale.set( 500, 250, 500 );
-    
-    bTriangulate = false;
-    
-    setupGUI();
-    //    ofLog(OF_LOG_VERBOSE);
+    sampleImgWidth = imgs[0].getWidth()/10;
+    sampleImgHeight =  imgs[0].getHeight()/10;
 }
-
 void testApp::setupGUI(){
     
     gui = new ofxUISuperCanvas("MOTION MONSTERS");
     gui->addSpacer();
+    gui->addFPS();
+    gui->addSpacer();
+    gui->addToggle("INVERT SELECTION", &bInvertSelection);
     gui->addToggle("TRIANGULATE", &bTriangulate);
     gui->addToggle("DRAW WIREFRAME", &bWireframe);
     gui->addSlider("MC THRESHOLD", 0.1, 1, &mc.threshold);
     gui->addToggle("SAVE OBJ",false);
     gui->addToggle("LOAD IMGS",false);
+//    gui->addImage("CURRENT IMAGE",&imgs[0],sampleImgWidth,sampleImgHeight);
+    gui->addLabel("TRIANGULATION PARAMS");
+    gui->addIntSlider("RES X", 1, 20, &triResX);
+    gui->addIntSlider("RES Y", 1, 20, &triResY);
+    gui->addIntSlider("RES Z", 10, 500, &triResZ);
+    gui->autoSizeToFitWidgets();
+
+    
+    
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
 }
 ///--------------------------------------------------------------
@@ -49,6 +70,10 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "TRIANGULATE"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         bTriangulate = t->getValue();
+        if(bTriangulate){
+            updateTraingulation();    
+        }
+        
     }
     if(name == "DRAW WIREFRAME"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
@@ -59,13 +84,12 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         if (t->getValue()) {
             saveToObj();
         }
-        
     }
     if(name == "LOAD IMGS"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         if (t->getValue()) {
             ofFileDialogResult result = ofSystemLoadDialog("Load Images From Folder", true, "Images/");
-            //            cout<<result.filePath<<endl;
+            //cout<<result.filePath<<endl;
             
             if(result.bSuccess && result.fileName.length())
             {
@@ -73,6 +97,10 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             }
         }
         
+    }
+    if(name == "INVERT SELECTION"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        bInvertSelection = t->getValue();
     }
 }
 //--------------------------------------------------------------
@@ -85,26 +113,29 @@ void testApp::loadImagesFromPath(string filePath){
         int size = dir.size();
         vector<ofFile>files= dir.getFiles();
         cout<<size<<endl;
-        
+
         for(int i=0; i<size; i++){
             cout<<files[i].getFileName()<<endl;
             for(int i=0; i<files.size(); i++){
                 ofImage img;
-                img.loadImage("Images/"+files[i].getFileName());
+                img.loadImage(filePath + "/"+files[i].getFileName());
                 imgs.push_back(img);
                 
-            }        }
+            }
+        }
     }
     else{
         cout<<"directory doesnt exist"<<endl;
     }
+    
+        updateResolution();
     
 }
 //--------------------------------------------------------------
 void testApp::update(){
     
     if (bTriangulate) {
-//        updateTraingulation();
+        //        updateTraingulation();
     }
     else{
         int imageIndex=0;
@@ -116,7 +147,6 @@ void testApp::update(){
                     float value;
                     ofColor c = imgs[imageIndex].getPixelsRef().getColor(i*32, j*32);
                     if(c.getHue()>0.){
-//                        cout<<imageIndex<<endl;
                         value = (c.getHue()/255);
                         value =1;
                         mc.setIsoValue( i, j, k, value * value );
@@ -125,7 +155,6 @@ void testApp::update(){
                         
                     }
                     imageIndex++;
-                    
                 }
             }
             mc.update();
@@ -161,7 +190,6 @@ void testApp::keyPressed(int key){
         mc.threshold += .03;
         cout<<mc.threshold<<endl;
     }
-    
     if(key =='h'){
         gui->toggleVisible();
     }
@@ -189,18 +217,27 @@ void testApp::keyPressed(int key){
     }
     
 }
+//resolution - x,y,z
+//invert hue
+//
 void testApp::updateTraingulation(){
     int imageIndex=0;
     triangulation.reset();
-    for(int i=0; i<imgs[0].getWidth(); i+=10){
-        for(int j=0; j<imgs[0].getHeight(); j+=10){
+    for(int i=0; i<imgs[0].getWidth(); i+=triResX){
+        for(int j=0; j<imgs[0].getHeight(); j+=triResY){
             imageIndex = imageIndex%13;
             
             float value;
             ofColor c = imgs[imageIndex].getPixelsRef().getColor(i, j);
-            if(c.getHue()>0.){
-                
-                triangulation.addPoint(ofPoint(i, j, imageIndex*10));
+            if(bInvertSelection){
+                if(c.getHue()>250.){
+                    triangulation.addPoint(ofPoint(i, j, triResZ+500));
+                }
+            }
+            else{
+                if(c.getHue()>0.){
+                    triangulation.addPoint(ofPoint(i, j, imageIndex+500));
+                }
             }
             imageIndex++;
         }
