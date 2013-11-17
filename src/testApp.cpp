@@ -6,7 +6,7 @@ void testApp::setup(){
     
 	drawGrid = true;
     bWireframe = false;
-    bInvertSelection = true;
+    bInvertSelection = false;
     scale = 1;
     
 	mc.setSmoothing( false );
@@ -16,26 +16,27 @@ void testApp::setup(){
         imgs.push_back(img);
         
     }
+    mc.setup();
+    cubeResolution = 32;
     updateResolution();
 
 	mc.scale.set( 500, 250, 500 );
-    
+    updateMarchingCubes();
     bTriangulate = false;
     triResX=2;
     triResY=2;
     triResZ=100;
-    
+
     setupGUI();
+    normalShader.load("shaders/normalShader");
 
     //    ofLog(OF_LOG_VERBOSE);
 }
 void testApp::updateResolution(){
-    float x= imgs[0].getWidth()/32;
-    float y = imgs[0].getHeight()/32;
-    mc.setup();
-	mc.setResolution(x,y,32);
-    sampleImgWidth = imgs[0].getWidth()/10;
-    sampleImgHeight =  imgs[0].getHeight()/10;
+    float x= imgs[0].getWidth()/cubeResolution;
+    float y = imgs[0].getHeight()/cubeResolution;
+	mc.setResolution(x,y,cubeResolution);
+
 }
 void testApp::setupGUI(){
     
@@ -43,17 +44,27 @@ void testApp::setupGUI(){
     gui->addSpacer();
     gui->addFPS();
     gui->addSpacer();
-    gui->addToggle("INVERT SELECTION", &bInvertSelection);
-    gui->addToggle("TRIANGULATE", &bTriangulate);
-    gui->addToggle("DRAW WIREFRAME", &bWireframe);
-    gui->addSlider("MC THRESHOLD", 0.1, 1, &mc.threshold);
     gui->addToggle("SAVE OBJ",false);
     gui->addToggle("LOAD IMGS",false);
-//    gui->addImage("CURRENT IMAGE",&imgs[0],sampleImgWidth,sampleImgHeight);
+    gui->addSpacer();
+    gui->addToggle("INVERT SELECTION", &bInvertSelection);
+    gui->addToggle("DRAW TRIANGULATION", &bTriangulate);
+    gui->addToggle("DRAW WIREFRAME", &bWireframe);
+    gui->addSpacer();
     gui->addLabel("TRIANGULATION PARAMS");
+    gui->addSpacer();
     gui->addIntSlider("RES X", 1, 20, &triResX);
     gui->addIntSlider("RES Y", 1, 20, &triResY);
     gui->addIntSlider("RES Z", 10, 500, &triResZ);
+    gui->addSpacer();
+    gui->addLabel("MC PARAMS");
+    gui->addIntSlider("CUBE RESOLUTION", 20, 500, &cubeResolution);
+    gui->addToggle("UPDATE MC", false);
+    gui->addSpacer();
+    gui->addSlider("MC THRESHOLD", 0.1, 1, &mc.threshold);
+//    gui->addIntSlider("RES X", 1, 20, &triResX);
+//    gui->addIntSlider("RES Y", 1, 20, &triResY);
+//    gui->addIntSlider("RES Z", 10, 500, &triResZ);
     gui->autoSizeToFitWidgets();
 
     
@@ -95,8 +106,18 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             {
                 loadImagesFromPath(result.filePath);
             }
+            t->setValue(false);
         }
         
+    }
+    if(name == "UPDATE MARCHING CUBES"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        if(!bTriangulate && t->getValue()){
+            updateResolution();
+            updateMarchingCubes();
+            t->setValue(false);
+        }
+
     }
     if(name == "INVERT SELECTION"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
@@ -138,27 +159,8 @@ void testApp::update(){
         //        updateTraingulation();
     }
     else{
-        int imageIndex=0;
-        for(int i=0; i<mc.resX; i++){
-            for(int j=0; j<mc.resY; j++){
-                for(int k=0; k<mc.resZ; k++){
-                    imageIndex = imageIndex%13;
-                    
-                    float value;
-                    ofColor c = imgs[imageIndex].getPixelsRef().getColor(i*32, j*32);
-                    if(c.getHue()>0.){
-                        value = (c.getHue()/255);
-                        value =1;
-                        mc.setIsoValue( i, j, k, value * value );
-                    }
-                    else{
-                        
-                    }
-                    imageIndex++;
-                }
-            }
-            mc.update();
-        }
+        mc.update();
+
     }
 }
 //--------------------------------------------------------------
@@ -166,14 +168,17 @@ void testApp::draw(){
     camera.begin();
     if(bTriangulate){
         ofPushStyle();
+        normalShader.begin();   
         bWireframe?  ofNoFill(): ofFill();
         triangulation.draw();
+        normalShader.end();
         ofPopStyle();
     }
     else{
+        normalShader.begin();
         bWireframe?	mc.drawWireframe() : mc.draw();
-        //draw the voxel grid
-        if(drawGrid)mc.drawGrid();
+        //draw the voxel grid           if(drawGrid)mc.drawGrid();
+        normalShader.end();
     }
     camera.end();
 }
@@ -189,6 +194,9 @@ void testApp::keyPressed(int key){
     if(key ==OF_KEY_UP){
         mc.threshold += .03;
         cout<<mc.threshold<<endl;
+    }
+    if(key =='f'){
+        ofToggleFullscreen();
     }
     if(key =='h'){
         gui->toggleVisible();
@@ -210,16 +218,39 @@ void testApp::keyPressed(int key){
         if(bTriangulate){
             updateTraingulation();
         }
-        
+        else{
+            updateResolution();
+            updateMarchingCubes();
+        }
     }
     if(key =='s'){
         saveToObj();
     }
     
 }
-//resolution - x,y,z
-//invert hue
-//
+void testApp::updateMarchingCubes(){
+    int imageIndex=0;
+    for(int i=0; i<mc.resX; i++){
+        for(int j=0; j<mc.resY; j++){
+            for(int k=0; k<mc.resZ; k++){
+                imageIndex = imageIndex%13;
+                
+                float value;
+                ofColor c = imgs[imageIndex].getPixelsRef().getColor(i*cubeResolution, j*cubeResolution);
+                if(c.getHue()>0.){
+                    value = (c.getHue()/255);
+                    value =1;
+                    mc.setIsoValue( i, j, k, value * value );
+                }
+                else{
+                    
+                }
+                imageIndex++;
+            }
+        }
+        mc.update();
+    }
+}
 void testApp::updateTraingulation(){
     int imageIndex=0;
     triangulation.reset();
@@ -230,13 +261,13 @@ void testApp::updateTraingulation(){
             float value;
             ofColor c = imgs[imageIndex].getPixelsRef().getColor(i, j);
             if(bInvertSelection){
-                if(c.getHue()>250.){
+                if(c.getHue()<0){
                     triangulation.addPoint(ofPoint(i, j, triResZ+500));
                 }
             }
             else{
                 if(c.getHue()>0.){
-                    triangulation.addPoint(ofPoint(i, j, imageIndex+500));
+                    triangulation.addPoint(ofPoint(i, j, triResZ+500));
                 }
             }
             imageIndex++;

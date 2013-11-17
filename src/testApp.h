@@ -23,6 +23,7 @@ public:
     void dragEvent(ofDragInfo dragInfo);
     void gotMessage(ofMessage msg);
     void updateTraingulation();
+    void updateMarchingCubes();
     void setupGUI();
     void guiEvent(ofxUIEventArgs &e);
     void saveToObj();
@@ -42,12 +43,17 @@ public:
     bool bWireframe;
     bool drawGrid;
     
+    
     int triResX;
     int triResY;
     int triResZ;
+    int scaleX, scaleY, scaleZ;
+    int cubeResolution;
     
     int sampleImgWidth;
     int sampleImgHeight;
+    
+    ofShader normalShader;
     
     //duration integration
 };
