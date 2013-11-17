@@ -3,7 +3,7 @@
 //--------------------------------------------------------------
 void testApp::setup(){
 	glEnable(GL_DEPTH_TEST);
-
+    
 	drawGrid = true;
     bWireframe = false;
     scale = 1;
@@ -21,15 +21,15 @@ void testApp::setup(){
     mc.setup();
 	mc.setResolution(x,y,32);
 	mc.scale.set( 500, 250, 500 );
-
+    
     bTriangulate = false;
-
+    
     setupGUI();
-//    ofLog(OF_LOG_VERBOSE);
+    //    ofLog(OF_LOG_VERBOSE);
 }
 
 void testApp::setupGUI(){
-
+    
     gui = new ofxUISuperCanvas("MOTION MONSTERS");
     gui->addSpacer();
     gui->addToggle("TRIANGULATE", &bTriangulate);
@@ -41,7 +41,7 @@ void testApp::setupGUI(){
 }
 ///--------------------------------------------------------------
 void testApp::guiEvent(ofxUIEventArgs &e){
-        
+    
     string name = e.widget->getName();
     int kind = e.widget->getKind();
     
@@ -65,14 +65,11 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         if (t->getValue()) {
             ofFileDialogResult result = ofSystemLoadDialog("Load Images From Folder", true, "Images/");
-//            cout<<result.filePath<<endl;
-
+            //            cout<<result.filePath<<endl;
+            
             if(result.bSuccess && result.fileName.length())
             {
                 loadImagesFromPath(result.filePath);
-            }
-            else{
-//                loadGUIS();
             }
         }
         
@@ -81,42 +78,45 @@ void testApp::guiEvent(ofxUIEventArgs &e){
 //--------------------------------------------------------------
 void testApp::loadImagesFromPath(string filePath){
     cout<<filePath<<endl;
+    imgs.clear();
     ofDirectory dir(filePath);
+    dir.listDir();
     if(dir.exists()){
         int size = dir.size();
-
+        vector<ofFile>files= dir.getFiles();
         cout<<size<<endl;
         
         for(int i=0; i<size; i++){
-          //  cout<<files[i].getFileName()<<endl;
-//            for(int i=0; i<13; i++){
-//                ofImage img;
-//                img.loadImage("Images/"+ofToString(i)+".png");
-//                imgs.push_back(img);
-//                
-        }
+            cout<<files[i].getFileName()<<endl;
+            for(int i=0; i<files.size(); i++){
+                ofImage img;
+                img.loadImage("Images/"+files[i].getFileName());
+                imgs.push_back(img);
+                
+            }        }
     }
     else{
         cout<<"directory doesnt exist"<<endl;
     }
-
+    
 }
 //--------------------------------------------------------------
 void testApp::update(){
     
     if (bTriangulate) {
-        updateTraingulation();
+//        updateTraingulation();
     }
     else{
         int imageIndex=0;
         for(int i=0; i<mc.resX; i++){
             for(int j=0; j<mc.resY; j++){
                 for(int k=0; k<mc.resZ; k++){
-                    imageIndex = imageIndex%3;
+                    imageIndex = imageIndex%13;
                     
                     float value;
-                    ofColor c = imgs[0].getPixelsRef().getColor(i*32, j*32);
+                    ofColor c = imgs[imageIndex].getPixelsRef().getColor(i*32, j*32);
                     if(c.getHue()>0.){
+//                        cout<<imageIndex<<endl;
                         value = (c.getHue()/255);
                         value =1;
                         mc.setIsoValue( i, j, k, value * value );
@@ -125,13 +125,13 @@ void testApp::update(){
                         
                     }
                     imageIndex++;
+                    
                 }
             }
+            mc.update();
         }
-        mc.update();
     }
 }
-
 //--------------------------------------------------------------
 void testApp::draw(){
     camera.begin();
@@ -192,17 +192,17 @@ void testApp::keyPressed(int key){
 void testApp::updateTraingulation(){
     int imageIndex=0;
     triangulation.reset();
-    for(int i=0; i<mc.resX; i++){
-        for(int j=0; j<mc.resY; j++){
-                imageIndex = imageIndex%13;
+    for(int i=0; i<imgs[0].getWidth(); i+=10){
+        for(int j=0; j<imgs[0].getHeight(); j+=10){
+            imageIndex = imageIndex%13;
+            
+            float value;
+            ofColor c = imgs[imageIndex].getPixelsRef().getColor(i, j);
+            if(c.getHue()>0.){
                 
-                float value;
-                ofColor c = imgs[imageIndex].getPixelsRef().getColor(i*32, j*32);
-                if(c.getHue()>0.){
-                    
-                    triangulation.addPoint(ofPoint(i, j, imageIndex*5));
-                }
-                imageIndex++;
+                triangulation.addPoint(ofPoint(i, j, imageIndex*10));
+            }
+            imageIndex++;
         }
     }
     triangulation.triangulate();
@@ -211,7 +211,7 @@ void testApp::updateTraingulation(){
 void testApp::saveToObj(){
     if(bTriangulate){
         cout<<"saving triangulated obj!"<<endl;
-        ofxObjLoader::save("TriangulatedObject_" + ofGetTimestampString(), triangulation.triangleMesh);
+        ofxObjLoader::save("TriangulatedObject_" + ofGetTimestampString()+".obj", triangulation.triangleMesh);
     }
     else{
         
