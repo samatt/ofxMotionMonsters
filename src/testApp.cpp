@@ -3,6 +3,7 @@
 //--------------------------------------------------------------
 void testApp::setup(){
 	glEnable(GL_DEPTH_TEST);
+
     imgs.resize(0);
 	drawGrid = false;
     bWireframe = false;
@@ -21,9 +22,11 @@ void testApp::setup(){
     mShowSelection = false;
     mEnableSelection = false;
     mShowTracerMesh = false;
+
     bInvertSelection = false;
     scale = 1;
 	mc.setSmoothing( false );
+
     
     mNumTracers = 100;
     
@@ -38,10 +41,12 @@ void testApp::setup(){
 	mc.scale.set( 500, 250, 500 );
     // updateResolution();
    // updateMarchingCubes();
+
     bTriangulate = false;
     triResX=2;
     triResY=2;
     triResZ=100;
+
     
     tX = 0;
     tY = 0;
@@ -70,15 +75,15 @@ void testApp::setup(){
     
     //camera.disableMouseInput();
 //    ofLog(OF_LOG_VERBOSE);
-}
 
+}
 void testApp::updateResolution(){
     float x= imgs[0].getWidth()/cubeResolution;
     float y = imgs[0].getHeight()/cubeResolution;
 	mc.setResolution(x,y,cubeResolution);
-    
-}
 
+
+}
 void testApp::setupGUIMC(){
     float xInit = OFX_UI_GLOBAL_WIDGET_SPACING;
     float length = 255-xInit;
@@ -104,10 +109,10 @@ void testApp::setupGUIMC(){
     //    gui->addIntSlider("RES Y", 1, 20, &triResY);
     //    gui->addIntSlider("RES Z", 10, 500, &triResZ);
     guiMC->autoSizeToFitWidgets();
-
+    
     
     ofAddListener(guiMC->newGUIEvent, this, &testApp::guiEvent);
-
+    
 }
 
 void testApp::setupGUITracers(){
@@ -122,10 +127,10 @@ void testApp::setupGUITracers(){
     guiT->addToggle("RUN TRACERS", &mRunTracers);
     guiT->addButton("MAKE MESH", false);
     guiT->addButton("RESET", false);
-
-
+    
+    
     ofAddListener(guiT->newGUIEvent, this, &testApp::guiEvent);
-
+    
 }
 
 void testApp::setupGUI(){
@@ -151,11 +156,12 @@ void testApp::setupGUI(){
     gui->addSpacer();
     gui->addToggle("USE TRACERS", &mUseTracers);
     gui->addToggle("USE MC", &mUseMC);
-
+    
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
-
-
+    
+    
 }
+
 
 void testApp::createBase(){
     
@@ -184,7 +190,7 @@ void testApp::createBase(){
 
 ///--------------------------------------------------------------
 void testApp::guiEvent(ofxUIEventArgs &e){
-        
+    
     string name = e.widget->getName();
     int kind = e.widget->getKind();
     
@@ -192,6 +198,10 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "TRIANGULATE"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         bTriangulate = t->getValue();
+        if(bTriangulate){
+            updateTraingulation();    
+        }
+        
     }
     if(name == "DRAW WIREFRAME"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
@@ -203,7 +213,6 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             saveToObj();
             t->setValue(false);
         }
-        
     }
     
     if(name=="MAKE MESH"){
@@ -338,22 +347,39 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             {
                 loadImagesFromPath(result.filePath);
             }
+
             mLoadImages = false;
+            t->setValue(false);
+
         }
         
+    }
+    if(name == "UPDATE MARCHING CUBES"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        if(!bTriangulate && t->getValue()){
+            updateResolution();
+            updateMarchingCubes();
+            t->setValue(false);
+        }
+
+    }
+    if(name == "INVERT SELECTION"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        bInvertSelection = t->getValue();
     }
 }
 //--------------------------------------------------------------
 void testApp::loadImagesFromPath(string filePath){
     cout<<filePath<<endl;
     imgs.clear();
-    
+
     ofDirectory dir(filePath);
     dir.listDir();
     if(dir.exists()){
         int size = dir.size();
         vector<ofFile>files= dir.getFiles();
         cout<<size<<endl;
+
         
         //for(int i=0; i<size; i++){
             for(int i=0; i<files.size(); i++){
@@ -364,16 +390,20 @@ void testApp::loadImagesFromPath(string filePath){
                 
             }
         //}
+
     }
     else{
         cout<<"directory doesnt exist"<<endl;
     }
     
+
     updateResolution();
+
 }
 //--------------------------------------------------------------
 void testApp::update(){
     
+
     if(mRunTracers){
         cout<<"run"<<endl;
         mModel.update();
@@ -400,16 +430,17 @@ void testApp::update(){
         else{
             mc.update();
         }
+
     }
     
     
 }
-
 //--------------------------------------------------------------
 void testApp::draw(){
 	ofBackgroundGradient(ofColor(64), ofColor(0));
     ofSetColor(255, 255, 255);
     camera.begin();
+
     if(mUseMC){
         if(bTriangulate){
             ofPushStyle();
@@ -432,6 +463,7 @@ void testApp::draw(){
         ofSetColor(255, 0, 0, 200);
         ofPolyline cur = curSel->getSmoothed(1);
         cur.draw();
+
     }
     
     if(mShowStencils){
@@ -494,7 +526,9 @@ void testApp::keyPressed(int key){
         mc.threshold += .03;
         cout<<mc.threshold<<endl;
     }
-    
+    if(key =='f'){
+        ofToggleFullscreen();
+    }
     if(key =='h'){
         gui->toggleVisible();
     }
@@ -526,17 +560,6 @@ void testApp::keyPressed(int key){
     
 }
 
-void testApp::saveToObj(){
-    if(bTriangulate){
-        cout<<"saving triangulated obj!"<<endl;
-        ofxObjLoader::save("TriangulatedObject_" + ofGetTimestampString(), triangulation.triangleMesh);
-    }
-    else{
-        
-        cout<<"saving marching cube obj!"<<endl;
-        mc.exportObj("MarchinCubesObject_"+ofGetTimestampString());
-    }
-}
 
 void testApp::updateMarchingCubes(){
     int imageIndex=0;
@@ -587,6 +610,7 @@ void testApp::updateTraingulation(){
 }
 
 
+
 vector<ofPolyline> testApp::getImageContours( ofImage &image){
     
     vector<ofPolyline> contours;
@@ -615,8 +639,22 @@ vector<ofPolyline> testApp::getImageContours( ofImage &image){
             contours.push_back(line.getSmoothed(2));
         }
     }
+        return contours;
+}
 
-    return contours;
+void testApp::saveToObj(){
+    if(bTriangulate){
+        cout<<"saving triangulated obj!"<<endl;
+        ofxObjLoader::save("TriangulatedObject_" + ofGetTimestampString()+".obj", triangulation.triangleMesh);
+    }
+    else{
+        
+        cout<<"saving marching cube obj!"<<endl;
+        mc.exportObj("MarchinCubesObject_"+ofGetTimestampString());
+
+    }
+
+
 }
 //--------------------------------------------------------------
 void testApp::keyReleased(int key){

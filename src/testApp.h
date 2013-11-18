@@ -3,12 +3,13 @@
 #include "ofMain.h"
 #include "ofxMarchingCubes.h"
 #include "ofxDelaunay.h"
-#include "ofxObjLoader.h" 
+#include "ofxObjLoader.h"
 #include "ofxUI.h"
 #include "TracerModel.h"
 #include "ofxCv.h"
 
 class testApp : public ofBaseApp{
+
 
 	public:
 		void setup();
@@ -100,6 +101,7 @@ class testApp : public ofBaseApp{
     ofVec2f mLastMouse;
     float mRotDampen;
     bool mEnableSelection;
+
     
     //duration integration
 };
