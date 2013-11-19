@@ -53,6 +53,10 @@ void testApp::setup(){
     tZ = 0;
     tS = 0;
     
+    prevX = 0;
+    prevY = 0;
+    prevZ = 0;
+    
     mRotDampen = .2;
     
     normalShader.load("shaders/normalShader");
@@ -150,9 +154,11 @@ void testApp::setupGUI(){
     gui->addWidgetDown(new ofxUI2DPad("CHOOSE", ofPoint(0,length-xInit), ofPoint(0,120), &mContInd, length-xInit,120));
     gui->addSlider("X", -ofGetWidth()/2, ofGetWidth()/2, &tX);
     gui->addSlider("Y", -ofGetHeight()/2, ofGetHeight()/2, &tY);
-    gui->addSlider("Z", 0, 1000000, &tZ);
+    gui->addSlider("Z", -1000, 100, &tZ);
     gui->addSlider("SCALE", 1 , 10, &tS);
     gui->addToggle("ADD SELECITON", &mAddContour);
+    gui->addSpacer();
+    gui->addButton("RESET STENCIL", false);
     gui->addSpacer();
     gui->addToggle("USE TRACERS", &mUseTracers);
     gui->addToggle("USE MC", &mUseMC);
@@ -203,6 +209,10 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         }
         
     }
+    
+    if(name == "RESET STENCIL"){
+        mStencil->reset();
+    }
     if(name == "DRAW WIREFRAME"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         bWireframe = t->getValue();
@@ -229,7 +239,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "GENERATE CONTOURS"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         if (t->getValue()) {
-            for(int i=0;i<1;i++){
+            for(int i=0;i<imgs.size();i++){
                 mContours.push_back(getImageContours(imgs[i]));
             }
             cout<<mContours.size()<<endl;
@@ -289,32 +299,26 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "X")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        ofVec3f vec = ofVec3f(tX, 0,0);
-        curSel->mWorldCenter = vec; //+= slider->getIncrement();
-        
+        curSel->mWorldCenter.x = tX; //+= slider->getIncrement();
 	}
     if(name == "Y")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        ofVec3f vec = ofVec3f(0, tY,0);
-        curSel->mWorldCenter = vec; //+= slider->getIncrement();
-        
+        curSel->mWorldCenter.y = tY; //+= slider->getIncrement();
 	}
     
     if(name == "Z")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        ofVec3f vec = ofVec3f(0, 0,tZ);
-        curSel->mWorldCenter = vec; //+= slider->getIncrement();
-        
+        curSel->mWorldCenter.z = tZ; //+= slider->getIncrement();
 	}
     
     if(name == "SCALE")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            curSel->getVertices()[i] *= slider->getScaledValue();
-        }
+//		ofxUISlider *slider = (ofxUISlider *) e.widget;
+//        for(int i=0;i<curSel->getVertices().size();i++){
+//            curSel->getVertices()[i] *= slider->getScaledValue();
+//        }
 	}
     
     if(name == "UPDATE MARCHING CUBES"){
@@ -487,7 +491,9 @@ void testApp::draw(){
     }
     if(mShowTracerMesh){
         ofSetColor(200,127);
-        mTracerMesh.drawWireframe();
+        normalShader.begin();
+        mTracerMesh.draw();
+        normalShader.end();
     }
     
     ofSetColor(100,9,255);
@@ -655,6 +661,7 @@ vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
             
             ofPolyline p = line.getSmoothed(2);
             ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p,n1);
+            n.close();
             contours.push_back(n);
         }
     }

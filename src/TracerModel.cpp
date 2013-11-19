@@ -20,7 +20,7 @@ void TracerModel::set( Stencil* stencil, const int &numTracers ){
     
         for (int i=0;i<numTracers;i++) {
             int arrPos = int(ofMap(i, 0, numTracers, 0, stencil->getSlices()[0].size()));
-            ofVec3f target = ofVec3f(stencil->getSlices()[0].getVertices()[arrPos].x, stencil->getSlices()[0].getVertices()[arrPos].y, stencil->getSlices()[0].getVertices()[arrPos].z );
+            ofVec3f target = ofVec3f(stencil->getSlices()[0].getWorldLocation(arrPos).x, stencil->getSlices()[0].getWorldLocation(arrPos).y, stencil->getSlices()[0].getWorldLocation(arrPos).z );
             //target.z += j*100;
             mTargets.push_back(target);
             ofPolyline b = stencil->getSlices()[stencil->getSlices().size()-1].getResampledByCount(numTracers);
@@ -30,7 +30,7 @@ void TracerModel::set( Stencil* stencil, const int &numTracers ){
         }
     
     for (int i=0;i<mTargets.size();i++) {
-        mTracers.push_back(new Tracer( mTargets[i],mBase.getVertices()[i], i));
+        mTracers.push_back(new Tracer( mTargets[i],mBase.getWorldLocation(i), i));
     }
     
 }
@@ -63,18 +63,57 @@ void TracerModel::draw(){
 void TracerModel::triangluation(ofMesh &mesh){
     
     vector<ofVec3f> masterPoints;
-    ofxDelaunay* tri = new ofxDelaunay();
+  //  ofxDelaunay* tri = new ofxDelaunay();
+    int smallest = 10000000000;
+    for(int i=0;i<mTracers.size();i++){
+        if(mTracers[i]->mPath.getVertices().size()<smallest)smallest = mTracers[i]->mPath.getVertices().size();
+    }
     
     for(int i=0;i<mTracers.size();i++){
-        for(int j =0; j<mTracers[i]->mPath.getVertices().size();j++){
-            masterPoints.push_back(ofVec3f(mTracers[i]->mPath.getVertices()[j]));
+        if(mTracers.size() != smallest){
+        ofPolyline3D newPath = mTracers[i]->mPath;
+        ofPolyline resample = mTracers[i]->mPath.getResampledByCount(smallest);
+        mTracers[i]->mPath = ofPolyline3D::convertToPolyline3D(resample, newPath);
         }
     }
     
-    tri->addPoints(masterPoints);
-    tri->triangulate();
-    mesh = tri->triangleMesh;
-    delete tri;
+    
+    for(int i=0;i<mTracers.size();i++){
+        for(int j =0; j<smallest;j++){
+            masterPoints.push_back(ofVec3f(mTracers[i]->mPath.getWorldLocation(j)));
+        }
+    }
+    
+ //   tri->addPoints(masterPoints);
+   // tri->triangulate();
+   // mesh = tri->triangleMesh;
+   // delete tri;
+    
+    mesh.setMode(OF_PRIMITIVE_TRIANGLE_STRIP);
+    
+    int height = mTracers.size();
+    int width = smallest;
+    
+    for (int y = 0; y < height; y++){
+		for (int x = 0; x<width; x++){
+			mesh.addVertex(masterPoints[x+y*width]);	// mesh index = x + y*width
+			//mesh.addTexCoord(ofVec2f(x,y)); // lock each vertex to the right texture coordinate
+		}
+	}
+	
+	for (int y = 0; y<height-1; y++){
+		for (int x=0; x<width-1; x++){
+			mesh.addIndex(x+y*width);				// 0
+			mesh.addIndex((x+1)+y*width);			// 1
+			mesh.addIndex(x+(y+1)*width);			// 10
+			
+			mesh.addIndex((x+1)+y*width);			// 1
+			mesh.addIndex((x+1)+(y+1)*width);		// 11
+			mesh.addIndex(x+(y+1)*width);			// 10
+		}
+	}
+
+    
 }
 
 void TracerModel::reset(){
@@ -112,4 +151,7 @@ vector<ofPolyline3D> Stencil::getSlices(){
     return slices;
 }
 
+void Stencil::reset(){
+    slices.clear();
+}
 

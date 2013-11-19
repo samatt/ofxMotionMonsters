@@ -13,6 +13,7 @@ public:
     vector<ofPolyline3D> getSlices();
     bool hasSlices();
     void draw();
+    void reset();
     ofPolyline3D getSlice( int &ID );
     
 private:
