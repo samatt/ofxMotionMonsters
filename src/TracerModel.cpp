@@ -35,6 +35,12 @@ void TracerModel::set( Stencil* stencil, const int &numTracers ){
     
 }
 
+void TracerModel::setSeperation(float &sep){
+    for(int i=0;i<mTracers.size();i++){
+        mTracers[i]->setSeperation(sep);
+    }
+}
+
 void TracerModel::update(){
  
     for(int i=0;i<mTracers.size();i++){
@@ -112,8 +118,6 @@ void TracerModel::triangluation(ofMesh &mesh){
 			mesh.addIndex(x+(y+1)*width);			// 10
 		}
 	}
-
-    
 }
 
 void TracerModel::reset(){

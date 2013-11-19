@@ -54,6 +54,7 @@ class testApp : public ofBaseApp{
         ofxCv::ContourFinder mContourFinder;
         bool                 mShowStencils, mShowTracers;
         vector<vector<ofPolyline3D> >  mContours;
+        vector<Obstacle>     mObstacles;
         Stencil*             mStencil;
     
         bool bInvertSelection;
@@ -82,6 +83,8 @@ class testApp : public ofBaseApp{
         int scaleX, scaleY, scaleZ;
         int cubeResolution;
     
+        float mTracerSep;
+    
         int mRunTracers;
         int mNumTracers;
     
@@ -90,7 +93,11 @@ class testApp : public ofBaseApp{
     
         float tX, tY, tZ, tS;
         float prevX, prevY, prevZ, prevS;
-
+        float mObsX, mObsY, mObsZ, mObsStrength, mObsRadius;
+        Obstacle* curObs;
+        float mObsChoose;
+        bool bHasObs;
+        bool bShowObs;
     
         ofShader normalShader;
     

@@ -29,7 +29,7 @@ void testApp::setup(){
 
     
     mNumTracers = 100;
-    
+    mTracerSep = 10;
 //    for(int i=0; i<13; i++){
 //        ofImage img;
 //        img.loadImage("Images/hands/"+ofToString(i)+".png");
@@ -47,7 +47,15 @@ void testApp::setup(){
     triResY=2;
     triResZ=100;
 
-    
+    mObsX = 0;
+    mObsY = 0;
+    mObsZ = 0;
+    mObsStrength = 0;
+    mObsRadius = 0;
+    mObsChoose = 0;
+    bHasObs = false;
+    bShowObs = true;
+
     tX = 0;
     tY = 0;
     tZ = 0;
@@ -124,14 +132,35 @@ void testApp::setupGUITracers(){
     float xInit = OFX_UI_GLOBAL_WIDGET_SPACING;
     float length = 255-xInit;
     
-    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight()/2);
+    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight());
     guiT->addSpacer();
     guiT->addToggle("SHOW TRACERS", &mShowTracers);
     guiT->addIntSlider("NUM TRACERS", 0, 1000, &mNumTracers);
+    guiT->addSlider("SEPERATION", 0, 100, &mTracerSep);
     guiT->addToggle("RUN TRACERS", &mRunTracers);
+    guiT->addSpacer();
     guiT->addButton("MAKE MESH", false);
+    guiT->addSpacer();
     guiT->addButton("RESET", false);
-    
+    guiT->addSpacer();
+    guiT->addLabel("OBSTACLES");
+    guiT->addSpacer();
+    guiT->addButton("ADD OBS", false);
+    guiT->addSlider("CHOOSE OBS", 0, 1, &mObsChoose);
+    guiT->addSlider("OBS-X", -ofGetWidth()/2, ofGetWidth()/2, &mObsX);
+    guiT->addSlider("OBS-Y", -ofGetHeight()/2, ofGetHeight()/2, &mObsY);
+    guiT->addSlider("OBS-Z", -1000, 1000, &mObsZ);
+    guiT->addSlider("OBS-STRENGTH", 0, 1, &mObsStrength);
+    guiT->addSlider("OBS-RADIUS", 0, 1000, &mObsRadius);
+    vector<string> items;
+    items.push_back("ATTRACTOR");
+    items.push_back("REPELLER");
+    items.push_back("NOISEDRAG");
+    guiT->addDropDownList("CHOOSE OBS TYPE", items, 200);
+    guiT->addToggle("ENABLE OBS", false);
+    guiT->addToggle("HIDE OBS", &bShowObs);
+
+
     
     ofAddListener(guiT->newGUIEvent, this, &testApp::guiEvent);
     
@@ -154,7 +183,7 @@ void testApp::setupGUI(){
     gui->addWidgetDown(new ofxUI2DPad("CHOOSE", ofPoint(0,length-xInit), ofPoint(0,120), &mContInd, length-xInit,120));
     gui->addSlider("X", -ofGetWidth()/2, ofGetWidth()/2, &tX);
     gui->addSlider("Y", -ofGetHeight()/2, ofGetHeight()/2, &tY);
-    gui->addSlider("Z", -1000, 100, &tZ);
+    gui->addSlider("Z", -1000, 1000, &tZ);
     gui->addSlider("SCALE", 1 , 10, &tS);
     gui->addToggle("ADD SELECITON", &mAddContour);
     gui->addSpacer();
@@ -224,7 +253,15 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             t->setValue(false);
         }
     }
+    if(name=="ATTRACTOR")curObs->setType(ATTRACTOR);
+    if(name=="REPELLER")curObs->setType(REPELLER);
+    if(name=="NOISEDRAG")curObs->setType(NOISEDRAG);
     
+    if(name=="ENABLE OBS"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        curObs->bEnabled = t->getValue();
+    }
+
     if(name=="MAKE MESH"){
         mModel.triangluation(mTracerMesh);
         mShowTracerMesh = true;
@@ -245,6 +282,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             cout<<mContours.size()<<endl;
         }
     }
+    
     
     
     if(name == "USE TRACERS"){
@@ -283,8 +321,12 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     }
     
     if(name=="RESET"){
-        mModel.reset();
-        mShowTracerMesh = false;
+        ofxUIButton* b  = (ofxUIButton*) e.widget;
+        if(b->getValue()){
+            mModel.reset();
+            mTracerMesh.clear();
+            mShowTracerMesh = false;
+        }
     }
 
     
@@ -294,23 +336,64 @@ void testApp::guiEvent(ofxUIEventArgs &e){
 		mCameraPos.z = slider->getScaledValue();
 	}
     
-    
+    if(name == "ADD OBS"){
+        ofxUIButton* b  = (ofxUIButton*) e.widget;
+        if(b->getValue()){
+        mObstacles.push_back(Obstacle());
+        cout<<mObstacles.size()<<endl;
+        bHasObs = true;
+        }
+    }
     
     if(name == "X")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
         curSel->mWorldCenter.x = tX; //+= slider->getIncrement();
 	}
     if(name == "Y")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
         curSel->mWorldCenter.y = tY; //+= slider->getIncrement();
 	}
     
     if(name == "Z")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
         curSel->mWorldCenter.z = tZ; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-X")
+	{
+        curObs->mLocation.x = mObsX; //+= slider->getIncrement();
+	}
+    if(name == "OBS-Y")
+	{
+        curObs->mLocation.y = mObsY; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-Z")
+	{
+        curObs->mLocation.z = mObsZ; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS STRENGTH")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+        mObsStrength = slider->getValue();
+        curObs->setStrength(mObsStrength); //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS RADIUS")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+        mObsRadius = slider->getValue();
+        curObs->setRadius(mObsRadius);
+        
+	}
+    
+    if(name == "SEPERATION")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+       // mTracerSep = slider->getValue();
+        mModel.setSeperation(mTracerSep);
+        
 	}
     
     if(name == "SCALE")
@@ -406,6 +489,12 @@ void testApp::update(){
     if(mRunTracers){
         cout<<"run"<<endl;
         mModel.update();
+        if(bHasObs){
+            for(int i=0;i<mObstacles.size();i++){
+                if(mObstacles[i].bEnabled)
+                    mObstacles[i].obstruct(mModel.mTracers);
+            }
+        }
     }
     
     if(mShowSelection){
@@ -414,6 +503,11 @@ void testApp::update(){
         mContIndSet.x = x;
         mContIndSet.y = y;
         curSel = &mContours[x][y];
+    }
+    
+    if(bHasObs){
+        int index = (int)ofMap(mObsChoose,0,1,0,mObstacles.size()-1);
+        curObs = &mObstacles[index];
     }
     
     if(mAddContour){
@@ -486,15 +580,24 @@ void testApp::draw(){
         }
     }
     
+    if(bHasObs && bShowObs){
+        curObs->drawSelection();
+        for(int i=0;i<mObstacles.size();i++){
+            mObstacles[i].draw();
+        }
+    }
+    
     if(mShowTracers){
         mModel.draw();
     }
     if(mShowTracerMesh){
         ofSetColor(200,127);
-        normalShader.begin();
+      //  normalShader.begin();
         mTracerMesh.draw();
-        normalShader.end();
+       // normalShader.end();
     }
+    
+    
     
     ofSetColor(100,9,255);
     ofCircle(0, 0, 2);

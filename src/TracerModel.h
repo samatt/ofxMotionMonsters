@@ -31,10 +31,11 @@ public:
     void set( Stencil* stencil, const int &numTracers);
     void triangluation(ofMesh &mesh);
     void reset();
-    
+    void setSeperation(float &sep);
+    vector<Tracer*> mTracers;
+
 private:
     
-    vector<Tracer*> mTracers;
     vector<ofVec3f> mTargets;
     ofPolyline3D mBase;
     vector<vector<ofVec3f> > mContours;
