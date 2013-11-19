@@ -29,7 +29,7 @@ void Tracer::update(){
         mVelocity.limit(mMaxspeed);
         mLocation+=mVelocity;
         mAcceleration*=0;
-        if (ofGetFrameNum()%10==0)mPath.addVertex(mLocation);
+        if (ofGetFrameNum()%10==0 && !hasArrived())mPath.addVertex(mLocation);
     }
 }
 
@@ -161,6 +161,7 @@ void Obstacle::setLocation(ofVec3f &_l){
 
 void Obstacle::setStrength(float &_s){
    mStrength = _s;
+   mColor.a = ofMap(_s, 0.f,1.f,.33f,1.f);
 }
 void Obstacle::setRadius(float &_r){
     mRadius = _r;

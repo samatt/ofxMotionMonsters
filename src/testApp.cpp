@@ -85,7 +85,8 @@ void testApp::setup(){
     mStencil = new Stencil();
     ofEnableAlphaBlending();
     
-    //camera.disableMouseInput();
+    camera.enableMouseInput();
+    camera.disableMouseInput();
 //    ofLog(OF_LOG_VERBOSE);
 
 }
@@ -191,7 +192,11 @@ void testApp::setupGUI(){
     gui->addSpacer();
     gui->addToggle("USE TRACERS", &mUseTracers);
     gui->addToggle("USE MC", &mUseMC);
-    
+    gui->addSpacer();
+    gui->addLabel("HOLD q TO ENABLE MOUSE");
+    gui->addLabel("CAMERA CONTROLS");
+    gui->addSpacer();
+
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
     
     
@@ -373,17 +378,17 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         curObs->mLocation.z = mObsZ; //+= slider->getIncrement();
 	}
     
-    if(name == "OBS STRENGTH")
+    if(name == "OBS-STRENGTH")
 	{
         ofxUISlider *slider = (ofxUISlider *) e.widget;
-        mObsStrength = slider->getValue();
+       // mObsStrength = slider->getValue();
         curObs->setStrength(mObsStrength); //+= slider->getIncrement();
 	}
     
-    if(name == "OBS RADIUS")
+    if(name == "OBS-RADIUS")
 	{
         ofxUISlider *slider = (ofxUISlider *) e.widget;
-        mObsRadius = slider->getValue();
+       // mObsRadius = slider->getValue();
         curObs->setRadius(mObsRadius);
         
 	}
@@ -624,7 +629,7 @@ void testApp::draw(){
 void testApp::keyPressed(int key){
     
     if(key=='q'){
-        camera.disableMouseInput();
+        camera.enableMouseInput();
         
     }
     
@@ -788,7 +793,7 @@ void testApp::saveToObj(){
 //--------------------------------------------------------------
 void testApp::keyReleased(int key){
     if(key=='q'){
-        camera.enableMouseInput();
+        camera.disableMouseInput();
         mEnableSelection = false;
     }
     if(key=='r')mRunTracers = !mRunTracers;
