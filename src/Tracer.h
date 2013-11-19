@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include "ofPolyline3D.h"
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -23,7 +24,7 @@ public:
 
     int mId;
     int mCurTargetID;
-    ofPolyline mPath;
+    ofPolyline3D mPath;
 
 
 private:

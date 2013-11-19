@@ -165,9 +165,9 @@ void testApp::setupGUI(){
 
 void testApp::createBase(){
     
-    vector<ofPolyline> tmp;
+    vector<ofPolyline3D> tmp;
     ofRectangle rect = ofRectangle(-100, -100, 200, 200);
-    ofPolyline base;
+    ofPolyline3D base;
     base.addVertex(rect.getTopLeft());
     base.addVertex(rect.getTopRight());
     base.addVertex(rect.getBottomRight());
@@ -175,7 +175,7 @@ void testApp::createBase(){
     base.close();
     tmp.push_back(base);
     
-    ofPolyline base2;
+    ofPolyline3D base2;
     
     for(int i=0;i<100;i++){
         float angle = ofMap(i,0,100,0,TWO_PI);
@@ -229,7 +229,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "GENERATE CONTOURS"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         if (t->getValue()) {
-            for(int i=0;i<imgs.size();i++){
+            for(int i=0;i<1;i++){
                 mContours.push_back(getImageContours(imgs[i]));
             }
             cout<<mContours.size()<<endl;
@@ -289,29 +289,24 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     if(name == "X")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
+        ofVec3f vec = ofVec3f(tX, 0,0);
+        curSel->mWorldCenter = vec; //+= slider->getIncrement();
         
-        mTransformMatrix.setTranslation(slider->getValue(), 0, 0);
-        
-        for(int i=0;i<curSel->getVertices().size();i++){
-            curSel->getVertices()[i] = curSel->getVertices()[i] * mTransformMatrix; //+= slider->getIncrement();
-        }
 	}
     if(name == "Y")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            float delta = curSel->getVertices()[i].y - slider->getScaledValue();
-            curSel->getVertices()[i].y += delta;
-        }
-    }
+        ofVec3f vec = ofVec3f(0, tY,0);
+        curSel->mWorldCenter = vec; //+= slider->getIncrement();
+        
+	}
     
     if(name == "Z")
 	{
 		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            float delta = curSel->getVertices()[i].z - slider->getScaledValue();
-            curSel->getVertices()[i].z += delta;
-        }
+        ofVec3f vec = ofVec3f(0, 0,tZ);
+        curSel->mWorldCenter = vec; //+= slider->getIncrement();
+        
 	}
     
     if(name == "SCALE")
@@ -418,7 +413,10 @@ void testApp::update(){
     }
     
     if(mAddContour){
-        mStencil->setSlice(mContours[mContIndSet.x][mContIndSet.y].getSmoothed(1));
+        ofPolyline p = mContours[mContIndSet.x][mContIndSet.y].getSmoothed(1);
+        ofPolyline3D n1 = mContours[mContIndSet.x][mContIndSet.y];
+        ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
+        mStencil->setSlice(n);
         mAddContour = false;
     }
     
@@ -461,8 +459,10 @@ void testApp::draw(){
     
     if(mShowSelection){
         ofSetColor(255, 0, 0, 200);
-        ofPolyline cur = curSel->getSmoothed(1);
-        cur.draw();
+        ofPolyline p = curSel->getSmoothed(1);
+        ofPolyline3D n1 = *curSel;
+        ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
+        n.draw();
 
     }
     
@@ -477,6 +477,7 @@ void testApp::draw(){
         for(int i=0;i<mContours.size();i++){
             for(int j=0;j<mContours[i].size();j++){
                 mContours[i][j].draw();
+                ofCircle( mContours[i][j].getCentroid2D().x,  mContours[i][j].getCentroid2D().y, 2);
             }
         }
     }
@@ -488,7 +489,9 @@ void testApp::draw(){
         ofSetColor(200,127);
         mTracerMesh.drawWireframe();
     }
-        
+    
+    ofSetColor(100,9,255);
+    ofCircle(0, 0, 2);
     
     camera.end();
     
@@ -611,9 +614,9 @@ void testApp::updateTraingulation(){
 
 
 
-vector<ofPolyline> testApp::getImageContours( ofImage &image){
+vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
     
-    vector<ofPolyline> contours;
+    vector<ofPolyline3D> contours;
     contours.resize(0);
     
     mContourFinder.setMinAreaRadius(20);
@@ -621,22 +624,38 @@ vector<ofPolyline> testApp::getImageContours( ofImage &image){
     mContourFinder.setSimplify(true);
     mContourFinder.findContours(image);
     
-    if (mContourFinder.getContours().size() > 0) {
-        for(int i =0;i<mContourFinder.getContours().size();i++){
+    vector<vector<cv::Point> > points = mContourFinder.getContours();
+    
+    if (points.size() > 0) {
+     //   for(int i =0;i<mContourFinder.getContours().size();i++){
+            for(int i =0;i<points.size();i++){
+
             ofPolyline line;
-            for(auto pt: mContourFinder.getContour(i)){
+            for(int j = 0; j<points[i].size()-2;j++){
                 ofVec3f pos;
-                ofColor ptColor = image.getColor(pt.x, pt.y);
+                ofColor ptColor = image.getColor(points[i][j].x, points[i][j].y);
                 float hue = ptColor.getHue();
-                pos = ofVec3f(pt.x,pt.y,ofMap(hue,0,255,0,500));
+                //change the 0 500 for scale
+                pos = ofVec3f(points[i][j].x,points[i][j].y,ofMap(hue,0,255,0,500));
                 
                 line.addVertex(pos);
             }
             
-            for(int i=0;i<line.getVertices().size();i++)
-                line.getVertices()[i] -= ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
+            ofPolyline3D n1 = ofPolyline3D();
+            //n1.mWorldCenter = ofVec3f(line.getCentroid2D().x,line.getCentroid2D().y,0);
+
+            line.close();
             
-            contours.push_back(line.getSmoothed(2));
+            ofVec3f center = ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
+                
+            for(int i=0;i<line.getVertices().size();i++){
+                ofVec3f diff = line.getVertices()[i] - center;
+                line.getVertices()[i] = diff;
+            }
+            
+            ofPolyline p = line.getSmoothed(2);
+            ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p,n1);
+            contours.push_back(n);
         }
     }
         return contours;
@@ -727,4 +746,5 @@ void testApp::gotMessage(ofMessage msg){
 void testApp::dragEvent(ofDragInfo dragInfo){
     
 }
+
 
