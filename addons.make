@@ -1,8 +1,8 @@
+ofxKinect
 ofxOpenCv
 ofxXmlSettings
 ofxCv
 ofxDelaunay
-ofxKinect
 ofxMarchingCubes
 ofxObjLoader
 ofxRange
