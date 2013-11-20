@@ -29,7 +29,7 @@ void Tracer::update(){
         mVelocity.limit(mMaxspeed);
         mLocation+=mVelocity;
         mAcceleration*=0;
-        if (ofGetFrameNum()%10==0)mPath.addVertex(mLocation);
+        if (ofGetFrameNum()%10==0 && !hasArrived())mPath.addVertex(mLocation);
     }
 }
 
@@ -54,8 +54,12 @@ ofVec3f Tracer::seek(const ofVec3f& target) {
     return steer;
 }
 
+void Tracer::setSeperation(float &sep){
+    mSeperation = sep;
+}
+
 ofVec3f Tracer::separate ( vector<Tracer*>& tracers) {
-    float desiredseparation = 5;
+    float desiredseparation = mSeperation;
     ofVec3f sum;
     int count = 0;
     for (int i=0;i<tracers.size();i++){
@@ -125,13 +129,30 @@ ofVec3f Tracer::getVel(){
 }
 
 
+Obstacle::Obstacle(): mLocation(ofVec3f::zero()), mStrength(.5f), mRadius(100.f), mType(REPELLER), bEnabled(false), mColor(ofFloatColor(.6, .1, .6, mStrength))
+{
+}
 
-Obstacle::Obstacle( ofVec3f &_location, float &_strength, float &_radius,  ObstacleType _type  )
+Obstacle::Obstacle( ofVec3f &_location, float &_strength, float &_radius,  ObstacleType _type  ) : bEnabled(false)
 {
     mLocation = _location;
     mRadius = _radius;
     mStrength = _strength;
     mType = _type;
+    
+    switch (mType) {
+        case REPELLER:
+            mColor = ofFloatColor(.6, .1, .6, mStrength);
+            break;
+        case NOISEDRAG:
+            mColor = ofFloatColor(.3, .5, .4, mStrength);
+            break;
+        case ATTRACTOR:
+            mColor = ofFloatColor(.2, .6, .8, mStrength);
+            break;
+        default:
+            break;
+    }
 }
 
 void Obstacle::setLocation(ofVec3f &_l){
@@ -140,30 +161,44 @@ void Obstacle::setLocation(ofVec3f &_l){
 
 void Obstacle::setStrength(float &_s){
    mStrength = _s;
+   mColor.a = ofMap(_s, 0.f,1.f,.33f,1.f);
 }
 void Obstacle::setRadius(float &_r){
     mRadius = _r;
 }
 void Obstacle::setType(ObstacleType _t){
     mType = _t;
+    switch (mType) {
+        case REPELLER:
+            mColor = ofFloatColor(.6, .1, .6, mStrength);
+            break;
+        case NOISEDRAG:
+            mColor = ofFloatColor(.3, .5, .4, mStrength);
+            break;
+        case ATTRACTOR:
+            mColor = ofFloatColor(.2, .6, .8, mStrength);
+            break;
+        default:
+            break;
+    }
 }
 ofVec3f Obstacle::repel(Tracer *&t){
     ofVec3f diff = mLocation - t->getLocation();
     float d = diff.length();
-    d = ofClamp(d, 5.f, mRadius);
+    //d = ofClamp(d, 5.f, mRadius*mRadius);
     float force = mStrength/d*d;
     diff.normalize();
     diff.scale(-force);
-    return diff;
+    if(d<mRadius) return diff; else return ofVec3f(0,0,0);
 }
 ofVec3f Obstacle::attract(Tracer *&t){
     ofVec3f diff = mLocation - t->getLocation();
     float d = diff.length();
-    d = ofClamp(d, 5.f, mRadius);
-    float force = mStrength/d*d;
+  //  d = ofClamp(d, 5.f, mRadius);
+    float force = 1/d*d;
     diff.normalize();
-    diff.scale(force);
-    return diff;
+    diff.scale(force*mStrength);
+    if(d>mRadius) return diff; else return ofVec3f(0,0,0);
 }
 ofVec3f Obstacle::drag(Tracer *&t){
     float speed = t->getVel().length();
@@ -171,6 +206,7 @@ ofVec3f Obstacle::drag(Tracer *&t){
     ofVec3f dragForce = ofVec3f(t->getVel());
     dragForce.scale(-1);
     dragForce.normalize();
+    dragForce *= 10*ofNoise(ofGetElapsedTimef());
     dragForce.scale(dragMagnitude);
     return dragForce;
 }
@@ -182,12 +218,15 @@ void Obstacle::obstruct(vector<Tracer *> &tracers){
         switch (mType) {
             case REPELLER:
                 tracers[i]->addForce(repel(tracers[i]));
+                mColor = ofFloatColor(.6, .1, .6, mStrength);
                 break;
-            case RESISTANCE:
+            case NOISEDRAG:
                 tracers[i]->addForce(drag(tracers[i]));
+                mColor = ofFloatColor(.3, .5, .4, mStrength);
                 break;
             case ATTRACTOR:
                 tracers[i]->addForce(attract(tracers[i]));
+                mColor = ofFloatColor(.2, .6, .8, mStrength);
                 break;
             default:
                 break;
@@ -196,3 +235,20 @@ void Obstacle::obstruct(vector<Tracer *> &tracers){
     }
     
 }
+
+void Obstacle::draw(){
+    
+    ofPushMatrix();
+    bEnabled ? ofSetColor(mColor) : ofSetColor(.4,.4,.4,.3);
+    ofTranslate(mLocation.x, mLocation.y, mLocation.z);
+    ofSphere(mRadius);
+    ofPopMatrix();
+    
+}
+
+void Obstacle::drawSelection(){
+    ofSetColor(255,255,0);
+    ofNoFill();
+    ofCircle(mLocation.x,mLocation.y, mLocation.z, 3);
+}
+

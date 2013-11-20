@@ -8,6 +8,7 @@
 #include "TracerModel.h"
 #include "ofxCv.h"
 
+
 class testApp : public ofBaseApp{
 
 
@@ -36,7 +37,7 @@ class testApp : public ofBaseApp{
         void updateResolution();
         void createBase();
     
-        vector<ofPolyline> getImageContours( ofImage &image );
+        vector<ofPolyline3D> getImageContours( ofImage &image );
     
         ofEasyCam camera;
         ofVec3f mCameraPos;
@@ -52,7 +53,8 @@ class testApp : public ofBaseApp{
         TracerModel          mModel;
         ofxCv::ContourFinder mContourFinder;
         bool                 mShowStencils, mShowTracers;
-        vector<vector<ofPolyline> >  mContours;
+        vector<vector<ofPolyline3D> >  mContours;
+        vector<Obstacle>     mObstacles;
         Stencil*             mStencil;
     
         bool bInvertSelection;
@@ -73,13 +75,15 @@ class testApp : public ofBaseApp{
         ofVec3f mContInd;
         ofVec3f mContIndSet;
     
-        ofPolyline* curSel;
+        ofPolyline3D* curSel;
     
         int triResX;
         int triResY;
         int triResZ;
         int scaleX, scaleY, scaleZ;
         int cubeResolution;
+    
+        float mTracerSep;
     
         int mRunTracers;
         int mNumTracers;
@@ -88,6 +92,12 @@ class testApp : public ofBaseApp{
         int sampleImgHeight;
     
         float tX, tY, tZ, tS;
+        float prevX, prevY, prevZ, prevS;
+        float mObsX, mObsY, mObsZ, mObsStrength, mObsRadius;
+        Obstacle* curObs;
+        float mObsChoose;
+        bool bHasObs;
+        bool bShowObs;
     
         ofShader normalShader;
     

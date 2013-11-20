@@ -29,7 +29,7 @@ void testApp::setup(){
 
     
     mNumTracers = 100;
-    
+    mTracerSep = 10;
 //    for(int i=0; i<13; i++){
 //        ofImage img;
 //        img.loadImage("Images/hands/"+ofToString(i)+".png");
@@ -47,11 +47,23 @@ void testApp::setup(){
     triResY=2;
     triResZ=100;
 
-    
+    mObsX = 0;
+    mObsY = 0;
+    mObsZ = 0;
+    mObsStrength = 0;
+    mObsRadius = 0;
+    mObsChoose = 0;
+    bHasObs = false;
+    bShowObs = true;
+
     tX = 0;
     tY = 0;
     tZ = 0;
     tS = 0;
+    
+    prevX = 0;
+    prevY = 0;
+    prevZ = 0;
     
     mRotDampen = .2;
     
@@ -73,7 +85,8 @@ void testApp::setup(){
     mStencil = new Stencil();
     ofEnableAlphaBlending();
     
-    //camera.disableMouseInput();
+    camera.enableMouseInput();
+    camera.disableMouseInput();
 //    ofLog(OF_LOG_VERBOSE);
 
 }
@@ -120,14 +133,35 @@ void testApp::setupGUITracers(){
     float xInit = OFX_UI_GLOBAL_WIDGET_SPACING;
     float length = 255-xInit;
     
-    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight()/2);
+    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight());
     guiT->addSpacer();
     guiT->addToggle("SHOW TRACERS", &mShowTracers);
     guiT->addIntSlider("NUM TRACERS", 0, 1000, &mNumTracers);
+    guiT->addSlider("SEPERATION", 0, 100, &mTracerSep);
     guiT->addToggle("RUN TRACERS", &mRunTracers);
+    guiT->addSpacer();
     guiT->addButton("MAKE MESH", false);
+    guiT->addSpacer();
     guiT->addButton("RESET", false);
-    
+    guiT->addSpacer();
+    guiT->addLabel("OBSTACLES");
+    guiT->addSpacer();
+    guiT->addButton("ADD OBS", false);
+    guiT->addSlider("CHOOSE OBS", 0, 1, &mObsChoose);
+    guiT->addSlider("OBS-X", -ofGetWidth()/2, ofGetWidth()/2, &mObsX);
+    guiT->addSlider("OBS-Y", -ofGetHeight()/2, ofGetHeight()/2, &mObsY);
+    guiT->addSlider("OBS-Z", -1000, 1000, &mObsZ);
+    guiT->addSlider("OBS-STRENGTH", 0, 1, &mObsStrength);
+    guiT->addSlider("OBS-RADIUS", 0, 1000, &mObsRadius);
+    vector<string> items;
+    items.push_back("ATTRACTOR");
+    items.push_back("REPELLER");
+    items.push_back("NOISEDRAG");
+    guiT->addDropDownList("CHOOSE OBS TYPE", items, 200);
+    guiT->addToggle("ENABLE OBS", false);
+    guiT->addToggle("HIDE OBS", &bShowObs);
+
+
     
     ofAddListener(guiT->newGUIEvent, this, &testApp::guiEvent);
     
@@ -150,13 +184,19 @@ void testApp::setupGUI(){
     gui->addWidgetDown(new ofxUI2DPad("CHOOSE", ofPoint(0,length-xInit), ofPoint(0,120), &mContInd, length-xInit,120));
     gui->addSlider("X", -ofGetWidth()/2, ofGetWidth()/2, &tX);
     gui->addSlider("Y", -ofGetHeight()/2, ofGetHeight()/2, &tY);
-    gui->addSlider("Z", 0, 1000000, &tZ);
+    gui->addSlider("Z", -1000, 1000, &tZ);
     gui->addSlider("SCALE", 1 , 10, &tS);
     gui->addToggle("ADD SELECITON", &mAddContour);
     gui->addSpacer();
+    gui->addButton("RESET STENCIL", false);
+    gui->addSpacer();
     gui->addToggle("USE TRACERS", &mUseTracers);
     gui->addToggle("USE MC", &mUseMC);
-    
+    gui->addSpacer();
+    gui->addLabel("HOLD q TO ENABLE MOUSE");
+    gui->addLabel("CAMERA CONTROLS");
+    gui->addSpacer();
+
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
     
     
@@ -165,9 +205,9 @@ void testApp::setupGUI(){
 
 void testApp::createBase(){
     
-    vector<ofPolyline> tmp;
+    vector<ofPolyline3D> tmp;
     ofRectangle rect = ofRectangle(-100, -100, 200, 200);
-    ofPolyline base;
+    ofPolyline3D base;
     base.addVertex(rect.getTopLeft());
     base.addVertex(rect.getTopRight());
     base.addVertex(rect.getBottomRight());
@@ -175,7 +215,7 @@ void testApp::createBase(){
     base.close();
     tmp.push_back(base);
     
-    ofPolyline base2;
+    ofPolyline3D base2;
     
     for(int i=0;i<100;i++){
         float angle = ofMap(i,0,100,0,TWO_PI);
@@ -203,6 +243,10 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         }
         
     }
+    
+    if(name == "RESET STENCIL"){
+        mStencil->reset();
+    }
     if(name == "DRAW WIREFRAME"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         bWireframe = t->getValue();
@@ -214,7 +258,15 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             t->setValue(false);
         }
     }
+    if(name=="ATTRACTOR")curObs->setType(ATTRACTOR);
+    if(name=="REPELLER")curObs->setType(REPELLER);
+    if(name=="NOISEDRAG")curObs->setType(NOISEDRAG);
     
+    if(name=="ENABLE OBS"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        curObs->bEnabled = t->getValue();
+    }
+
     if(name=="MAKE MESH"){
         mModel.triangluation(mTracerMesh);
         mShowTracerMesh = true;
@@ -235,6 +287,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             cout<<mContours.size()<<endl;
         }
     }
+    
     
     
     if(name == "USE TRACERS"){
@@ -273,8 +326,12 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     }
     
     if(name=="RESET"){
-        mModel.reset();
-        mShowTracerMesh = false;
+        ofxUIButton* b  = (ofxUIButton*) e.widget;
+        if(b->getValue()){
+            mModel.reset();
+            mTracerMesh.clear();
+            mShowTracerMesh = false;
+        }
     }
 
     
@@ -284,42 +341,72 @@ void testApp::guiEvent(ofxUIEventArgs &e){
 		mCameraPos.z = slider->getScaledValue();
 	}
     
-    
-    
-    if(name == "X")
-	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        
-        mTransformMatrix.setTranslation(slider->getValue(), 0, 0);
-        
-        for(int i=0;i<curSel->getVertices().size();i++){
-            curSel->getVertices()[i] = curSel->getVertices()[i] * mTransformMatrix; //+= slider->getIncrement();
-        }
-	}
-    if(name == "Y")
-	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            float delta = curSel->getVertices()[i].y - slider->getScaledValue();
-            curSel->getVertices()[i].y += delta;
+    if(name == "ADD OBS"){
+        ofxUIButton* b  = (ofxUIButton*) e.widget;
+        if(b->getValue()){
+        mObstacles.push_back(Obstacle());
+        cout<<mObstacles.size()<<endl;
+        bHasObs = true;
         }
     }
     
+    if(name == "X")
+	{
+        curSel->mWorldCenter.x = tX; //+= slider->getIncrement();
+	}
+    if(name == "Y")
+	{
+        curSel->mWorldCenter.y = tY; //+= slider->getIncrement();
+	}
+    
     if(name == "Z")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            float delta = curSel->getVertices()[i].z - slider->getScaledValue();
-            curSel->getVertices()[i].z += delta;
-        }
+        curSel->mWorldCenter.z = tZ; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-X")
+	{
+        curObs->mLocation.x = mObsX; //+= slider->getIncrement();
+	}
+    if(name == "OBS-Y")
+	{
+        curObs->mLocation.y = mObsY; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-Z")
+	{
+        curObs->mLocation.z = mObsZ; //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-STRENGTH")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+       // mObsStrength = slider->getValue();
+        curObs->setStrength(mObsStrength); //+= slider->getIncrement();
+	}
+    
+    if(name == "OBS-RADIUS")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+       // mObsRadius = slider->getValue();
+        curObs->setRadius(mObsRadius);
+        
+	}
+    
+    if(name == "SEPERATION")
+	{
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+       // mTracerSep = slider->getValue();
+        mModel.setSeperation(mTracerSep);
+        
 	}
     
     if(name == "SCALE")
 	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-        for(int i=0;i<curSel->getVertices().size();i++){
-            curSel->getVertices()[i] *= slider->getScaledValue();
-        }
+//		ofxUISlider *slider = (ofxUISlider *) e.widget;
+//        for(int i=0;i<curSel->getVertices().size();i++){
+//            curSel->getVertices()[i] *= slider->getScaledValue();
+//        }
 	}
     
     if(name == "UPDATE MARCHING CUBES"){
@@ -407,6 +494,12 @@ void testApp::update(){
     if(mRunTracers){
         cout<<"run"<<endl;
         mModel.update();
+        if(bHasObs){
+            for(int i=0;i<mObstacles.size();i++){
+                if(mObstacles[i].bEnabled)
+                    mObstacles[i].obstruct(mModel.mTracers);
+            }
+        }
     }
     
     if(mShowSelection){
@@ -417,8 +510,16 @@ void testApp::update(){
         curSel = &mContours[x][y];
     }
     
+    if(bHasObs){
+        int index = (int)ofMap(mObsChoose,0,1,0,mObstacles.size()-1);
+        curObs = &mObstacles[index];
+    }
+    
     if(mAddContour){
-        mStencil->setSlice(mContours[mContIndSet.x][mContIndSet.y].getSmoothed(1));
+        ofPolyline p = mContours[mContIndSet.x][mContIndSet.y].getSmoothed(1);
+        ofPolyline3D n1 = mContours[mContIndSet.x][mContIndSet.y];
+        ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
+        mStencil->setSlice(n);
         mAddContour = false;
     }
     
@@ -461,8 +562,10 @@ void testApp::draw(){
     
     if(mShowSelection){
         ofSetColor(255, 0, 0, 200);
-        ofPolyline cur = curSel->getSmoothed(1);
-        cur.draw();
+        ofPolyline p = curSel->getSmoothed(1);
+        ofPolyline3D n1 = *curSel;
+        ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
+        n.draw();
 
     }
     
@@ -477,7 +580,15 @@ void testApp::draw(){
         for(int i=0;i<mContours.size();i++){
             for(int j=0;j<mContours[i].size();j++){
                 mContours[i][j].draw();
+                ofCircle( mContours[i][j].getCentroid2D().x,  mContours[i][j].getCentroid2D().y, 2);
             }
+        }
+    }
+    
+    if(bHasObs && bShowObs){
+        curObs->drawSelection();
+        for(int i=0;i<mObstacles.size();i++){
+            mObstacles[i].draw();
         }
     }
     
@@ -486,9 +597,15 @@ void testApp::draw(){
     }
     if(mShowTracerMesh){
         ofSetColor(200,127);
-        mTracerMesh.drawWireframe();
+      //  normalShader.begin();
+        mTracerMesh.draw();
+       // normalShader.end();
     }
-        
+    
+    
+    
+    ofSetColor(100,9,255);
+    ofCircle(0, 0, 2);
     
     camera.end();
     
@@ -512,7 +629,7 @@ void testApp::draw(){
 void testApp::keyPressed(int key){
     
     if(key=='q'){
-        camera.disableMouseInput();
+        camera.enableMouseInput();
         
     }
     
@@ -611,9 +728,9 @@ void testApp::updateTraingulation(){
 
 
 
-vector<ofPolyline> testApp::getImageContours( ofImage &image){
+vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
     
-    vector<ofPolyline> contours;
+    vector<ofPolyline3D> contours;
     contours.resize(0);
     
     mContourFinder.setMinAreaRadius(20);
@@ -621,22 +738,39 @@ vector<ofPolyline> testApp::getImageContours( ofImage &image){
     mContourFinder.setSimplify(true);
     mContourFinder.findContours(image);
     
-    if (mContourFinder.getContours().size() > 0) {
-        for(int i =0;i<mContourFinder.getContours().size();i++){
+    vector<vector<cv::Point> > points = mContourFinder.getContours();
+    
+    if (points.size() > 0) {
+     //   for(int i =0;i<mContourFinder.getContours().size();i++){
+            for(int i =0;i<points.size();i++){
+
             ofPolyline line;
-            for(auto pt: mContourFinder.getContour(i)){
+            for(int j = 0; j<points[i].size()-2;j++){
                 ofVec3f pos;
-                ofColor ptColor = image.getColor(pt.x, pt.y);
+                ofColor ptColor = image.getColor(points[i][j].x, points[i][j].y);
                 float hue = ptColor.getHue();
-                pos = ofVec3f(pt.x,pt.y,ofMap(hue,0,255,0,500));
+                //change the 0 500 for scale
+                pos = ofVec3f(points[i][j].x,points[i][j].y,ofMap(hue,0,255,0,500));
                 
                 line.addVertex(pos);
             }
             
-            for(int i=0;i<line.getVertices().size();i++)
-                line.getVertices()[i] -= ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
+            ofPolyline3D n1 = ofPolyline3D();
+            //n1.mWorldCenter = ofVec3f(line.getCentroid2D().x,line.getCentroid2D().y,0);
+
+            line.close();
             
-            contours.push_back(line.getSmoothed(2));
+            ofVec3f center = ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
+                
+            for(int i=0;i<line.getVertices().size();i++){
+                ofVec3f diff = line.getVertices()[i] - center;
+                line.getVertices()[i] = diff;
+            }
+            
+            ofPolyline p = line.getSmoothed(2);
+            ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p,n1);
+            n.close();
+            contours.push_back(n);
         }
     }
         return contours;
@@ -659,7 +793,7 @@ void testApp::saveToObj(){
 //--------------------------------------------------------------
 void testApp::keyReleased(int key){
     if(key=='q'){
-        camera.enableMouseInput();
+        camera.disableMouseInput();
         mEnableSelection = false;
     }
     if(key=='r')mRunTracers = !mRunTracers;
@@ -727,4 +861,5 @@ void testApp::gotMessage(ofMessage msg){
 void testApp::dragEvent(ofDragInfo dragInfo){
     
 }
+
 

@@ -8,15 +8,16 @@ class Stencil{
 public:
     
     Stencil();
-    void setSlice( ofPolyline poly );
+    void setSlice( ofPolyline3D poly );
     void removeSlice( int &ID );
-    vector<ofPolyline> getSlices();
+    vector<ofPolyline3D> getSlices();
     bool hasSlices();
     void draw();
-    ofPolyline getSlice( int &ID );
+    void reset();
+    ofPolyline3D getSlice( int &ID );
     
 private:
-    vector<ofPolyline> slices;
+    vector<ofPolyline3D> slices;
 };
 
 class TracerModel{
@@ -30,19 +31,20 @@ public:
     void set( Stencil* stencil, const int &numTracers);
     void triangluation(ofMesh &mesh);
     void reset();
-    
+    void setSeperation(float &sep);
+    vector<Tracer*> mTracers;
+
 private:
     
-    vector<Tracer*> mTracers;
     vector<ofVec3f> mTargets;
-    ofPolyline mBase;
+    ofPolyline3D mBase;
     vector<vector<ofVec3f> > mContours;
     bool mIsSet;
-    ofPolyline base;
+    ofPolyline3D base;
 
 };
 
 
-static ofPolyline mergePolylines( ofPolyline slice1, ofPolyline slice2 );
+static ofPolyline3D mergePolylines( ofPolyline3D slice1, ofPolyline3D slice2 );
 
 

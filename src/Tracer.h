@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include "ofPolyline3D.h"
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -20,11 +21,12 @@ public:
     void findNext( vector<ofVec3f>& targets);
     ofVec3f getLocation();
     ofVec3f getVel();
+    void setSeperation(float &sep);
 
     int mId;
     int mCurTargetID;
-    ofPolyline mPath;
-
+    ofPolyline3D mPath;
+    float mSeperation;
 
 private:
     
@@ -44,27 +46,33 @@ private:
 };
 
 enum ObstacleType {
-    ATTRACTOR, REPELLER, RESISTANCE
+    ATTRACTOR, REPELLER, NOISEDRAG
 };
 
 class Obstacle {
 public:
     
+    Obstacle();
     Obstacle( ofVec3f &_location, float &_strength, float &_radius,  ObstacleType _type );
     void setStrength( float &_s );
     void setLocation( ofVec3f &_l );
     void setType( ObstacleType _t );
     void obstruct( vector<Tracer*> &tracers );
     void setRadius(float &_r);
+    void draw();
+    void drawSelection();
+    float   mRadius;
+    ofVec3f mLocation;
+    float   mStrength;
+    ObstacleType mType;
+    bool    bEnabled;
+    
     
 private:
     
     ofVec3f repel(Tracer* &t);
     ofVec3f attract(Tracer* &t);
     ofVec3f drag(Tracer* &t);
-    ofVec3f mLocation;
-    float   mStrength;
-    ObstacleType mType;
-    float   mRadius;
+    ofFloatColor mColor;
     
 };
