@@ -8,7 +8,6 @@
 #include "TracerModel.h"
 #include "ofxCv.h"
 
-
 class testApp : public ofBaseApp{
 
 
@@ -59,7 +58,9 @@ class testApp : public ofBaseApp{
     
         bool bInvertSelection;
         bool bTriangulate;
+        bool bMarchingCubes;
         bool bWireframe;
+        bool bContours;
         bool drawGrid;
         bool mGenContours;
         bool mUseTracers;
@@ -82,7 +83,7 @@ class testApp : public ofBaseApp{
         int triResZ;
         int scaleX, scaleY, scaleZ;
         int cubeResolution;
-    
+
         float mTracerSep;
     
         int mRunTracers;
@@ -99,7 +100,9 @@ class testApp : public ofBaseApp{
         bool bHasObs;
         bool bShowObs;
     
-        ofShader normalShader;
+        float isoValue;
+    
+        ofShader shader;
     
         ofMatrix4x4 mTransformMatrix;
         ofMesh mTracerMesh;

@@ -3,7 +3,7 @@
 //--------------------------------------------------------------
 void testApp::setup(){
 	glEnable(GL_DEPTH_TEST);
-
+    
     imgs.resize(0);
 	drawGrid = false;
     bWireframe = false;
@@ -15,6 +15,7 @@ void testApp::setup(){
     mLoadImages = false;
     mUseMC = false;
     bTriangulate = false;
+    bContours = false;
     mAllowSliceComp = false;
     mShowContours = true;
     mAddContour = false;
@@ -22,31 +23,31 @@ void testApp::setup(){
     mShowSelection = false;
     mEnableSelection = false;
     mShowTracerMesh = false;
-
+    isoValue = 1;
+    
     bInvertSelection = false;
     scale = 1;
 	mc.setSmoothing( false );
-
+    
     
     mNumTracers = 100;
-    mTracerSep = 10;
-//    for(int i=0; i<13; i++){
-//        ofImage img;
-//        img.loadImage("Images/hands/"+ofToString(i)+".png");
-//        imgs.push_back(img);
-//        
-//    }
+    
+    for(int i=0; i<13; i++){
+        ofImage img;
+        img.loadImage("Images/hands/"+ofToString(i)+".png");
+        imgs.push_back(img);
+        
+    }
     mc.setup();
     cubeResolution = 32;
 	mc.scale.set( 500, 250, 500 );
-    // updateResolution();
-   // updateMarchingCubes();
-
+    
+    
     bTriangulate = false;
     triResX=2;
     triResY=2;
     triResZ=100;
-
+    
     mObsX = 0;
     mObsY = 0;
     mObsZ = 0;
@@ -55,7 +56,7 @@ void testApp::setup(){
     mObsChoose = 0;
     bHasObs = false;
     bShowObs = true;
-
+    
     tX = 0;
     tY = 0;
     tZ = 0;
@@ -67,8 +68,8 @@ void testApp::setup(){
     
     mRotDampen = .2;
     
-    normalShader.load("shaders/normalShader");
-
+    shader.load("shaders/facingRatio");
+    
     setupGUI();
     setupGUIMC();
     setupGUITracers();
@@ -80,22 +81,27 @@ void testApp::setup(){
     
     mContInd = ofVec3f::zero();
     mContIndSet = ofVec3f::zero();
-
+    
     
     mStencil = new Stencil();
     ofEnableAlphaBlending();
     
     camera.enableMouseInput();
     camera.disableMouseInput();
-//    ofLog(OF_LOG_VERBOSE);
-
+    //    ofLog(OF_LOG_VERBOSE);
+    
 }
 void testApp::updateResolution(){
-    float x= imgs[0].getWidth()/cubeResolution;
-    float y = imgs[0].getHeight()/cubeResolution;
-	mc.setResolution(x,y,cubeResolution);
-
-
+    if(imgs.size()> 0){
+        float x= imgs[0].getWidth()/cubeResolution;
+        float y = imgs[0].getHeight()/cubeResolution;
+        mc.setResolution(x,y,cubeResolution);
+    }
+    else{
+        cout<<"NO IMAGES LOADED!"<<endl;
+    }
+    
+    
 }
 void testApp::setupGUIMC(){
     float xInit = OFX_UI_GLOBAL_WIDGET_SPACING;
@@ -104,6 +110,7 @@ void testApp::setupGUIMC(){
     guiMC->addSpacer();
     guiMC->addToggle("SAVE OBJ",&mSaveObj);
     guiMC->addToggle("INVERT SELECTION", &bInvertSelection);
+    guiMC->addToggle("DRAW MC", &bMarchingCubes);
     guiMC->addToggle("DRAW TRIANGULATION", &bTriangulate);
     guiMC->addToggle("DRAW WIREFRAME", &bWireframe);
     guiMC->addSpacer();
@@ -116,11 +123,9 @@ void testApp::setupGUIMC(){
     guiMC->addLabel("MC PARAMS");
     guiMC->addIntSlider("CUBE RESOLUTION", 20, 500, &cubeResolution);
     guiMC->addToggle("UPDATE MC", false);
+    guiMC->addSlider("ISO VALUE",0.1,10.0,&isoValue);
     guiMC->addSpacer();
     guiMC->addSlider("MC THRESHOLD", 0.1, 1, &mc.threshold);
-    //    gui->addIntSlider("RES X", 1, 20, &triResX);
-    //    gui->addIntSlider("RES Y", 1, 20, &triResY);
-    //    gui->addIntSlider("RES Z", 10, 500, &triResZ);
     guiMC->autoSizeToFitWidgets();
     
     
@@ -133,7 +138,7 @@ void testApp::setupGUITracers(){
     float xInit = OFX_UI_GLOBAL_WIDGET_SPACING;
     float length = 255-xInit;
     
-    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight());
+    guiT = new ofxUISuperCanvas("TRACERS", length*2+xInit*2+4, 0, length+xInit, ofGetHeight()/2);
     guiT->addSpacer();
     guiT->addToggle("SHOW TRACERS", &mShowTracers);
     guiT->addIntSlider("NUM TRACERS", 0, 1000, &mNumTracers);
@@ -160,8 +165,9 @@ void testApp::setupGUITracers(){
     guiT->addDropDownList("CHOOSE OBS TYPE", items, 200);
     guiT->addToggle("ENABLE OBS", false);
     guiT->addToggle("HIDE OBS", &bShowObs);
-
-
+    
+    
+    
     
     ofAddListener(guiT->newGUIEvent, this, &testApp::guiEvent);
     
@@ -196,7 +202,9 @@ void testApp::setupGUI(){
     gui->addLabel("HOLD q TO ENABLE MOUSE");
     gui->addLabel("CAMERA CONTROLS");
     gui->addSpacer();
-
+    gui->addToggle("NORMAL SHADER", false);
+    gui->addToggle("FR SHADER", false);
+    
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
     
     
@@ -233,19 +241,37 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     
     string name = e.widget->getName();
     int kind = e.widget->getKind();
-    
+    cout<<name<<endl;
     
     if(name == "TRIANGULATE"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         bTriangulate = t->getValue();
         if(bTriangulate){
-            updateTraingulation();    
+            updateTraingulation();
         }
         
+    }
+    if(name == "DRAW MC"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        bMarchingCubes = t->getValue();
+        updateResolution();
+        updateMarchingCubes();
     }
     
     if(name == "RESET STENCIL"){
         mStencil->reset();
+    }
+    if(name == "UPDATE MC"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        t->setValue(false);
+        if(bMarchingCubes){
+            updateResolution();
+            updateMarchingCubes();
+        }
+        else{
+            cout<<"Not in marching cubes mode"<<endl;
+        }
+        
     }
     if(name == "DRAW WIREFRAME"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
@@ -266,7 +292,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         curObs->bEnabled = t->getValue();
     }
-
+    
     if(name=="MAKE MESH"){
         mModel.triangluation(mTracerMesh);
         mShowTracerMesh = true;
@@ -280,6 +306,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     
     if(name == "GENERATE CONTOURS"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        bContours = t->getValue();
         if (t->getValue()) {
             for(int i=0;i<imgs.size();i++){
                 mContours.push_back(getImageContours(imgs[i]));
@@ -287,8 +314,16 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             cout<<mContours.size()<<endl;
         }
     }
-    
-    
+    if(name == "NORMAL SHADER"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        t->setValue(false);
+        shader.load("shaders/normalShader");
+    }
+    if(name == "FR SHADER"){
+        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        t->setValue(false);
+        shader.load("shaders/facingRatio");
+    }
     
     if(name == "USE TRACERS"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
@@ -298,9 +333,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     }
     
     if(name == "USE MC"){
-        //ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         guiMC->toggleVisible();
-     //   cout<<"visible"<<endl;
     }
     
     if(name == "SHOW TRACERS"){
@@ -333,85 +366,86 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             mShowTracerMesh = false;
         }
     }
-
+    
     
     if(name == "ZOOM")
-	{
-		ofxUISlider *slider = (ofxUISlider *) e.widget;
-		mCameraPos.z = slider->getScaledValue();
-	}
+    {
+        ofxUISlider *slider = (ofxUISlider *) e.widget;
+        mCameraPos.z = slider->getScaledValue();
+    }
     
     if(name == "ADD OBS"){
         ofxUIButton* b  = (ofxUIButton*) e.widget;
         if(b->getValue()){
-        mObstacles.push_back(Obstacle());
-        cout<<mObstacles.size()<<endl;
-        bHasObs = true;
+            mObstacles.push_back(Obstacle());
+            cout<<mObstacles.size()<<endl;
+            bHasObs = true;
         }
     }
     
     if(name == "X")
-	{
+    {
         curSel->mWorldCenter.x = tX; //+= slider->getIncrement();
-	}
+    }
     if(name == "Y")
-	{
+    {
         curSel->mWorldCenter.y = tY; //+= slider->getIncrement();
-	}
+    }
     
     if(name == "Z")
-	{
+    {
         curSel->mWorldCenter.z = tZ; //+= slider->getIncrement();
-	}
+    }
     
     if(name == "OBS-X")
-	{
+    {
         curObs->mLocation.x = mObsX; //+= slider->getIncrement();
-	}
+    }
     if(name == "OBS-Y")
-	{
+    {
         curObs->mLocation.y = mObsY; //+= slider->getIncrement();
-	}
+    }
     
     if(name == "OBS-Z")
-	{
+    {
         curObs->mLocation.z = mObsZ; //+= slider->getIncrement();
-	}
+    }
     
     if(name == "OBS-STRENGTH")
-	{
+    {
         ofxUISlider *slider = (ofxUISlider *) e.widget;
-       // mObsStrength = slider->getValue();
+        // mObsStrength = slider->getValue();
         curObs->setStrength(mObsStrength); //+= slider->getIncrement();
-	}
+    }
     
     if(name == "OBS-RADIUS")
-	{
+    {
         ofxUISlider *slider = (ofxUISlider *) e.widget;
-       // mObsRadius = slider->getValue();
+        // mObsRadius = slider->getValue();
         curObs->setRadius(mObsRadius);
         
-	}
+    }
     
     if(name == "SEPERATION")
-	{
+    {
         ofxUISlider *slider = (ofxUISlider *) e.widget;
-       // mTracerSep = slider->getValue();
+        // mTracerSep = slider->getValue();
         mModel.setSeperation(mTracerSep);
         
-	}
+    }
     
     if(name == "SCALE")
-	{
-//		ofxUISlider *slider = (ofxUISlider *) e.widget;
-//        for(int i=0;i<curSel->getVertices().size();i++){
-//            curSel->getVertices()[i] *= slider->getScaledValue();
-//        }
-	}
+    {
+        //		ofxUISlider *slider = (ofxUISlider *) e.widget;
+        //        for(int i=0;i<curSel->getVertices().size();i++){
+        //            curSel->getVertices()[i] *= slider->getScaledValue();
+        //        }
+    }
     
     if(name == "UPDATE MARCHING CUBES"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
-        if(!bTriangulate && t->getValue()){
+        bMarchingCubes = t->getValue();
+        if(t->getValue()){
             updateResolution();
             updateMarchingCubes();
             t->setValue(false);
@@ -421,76 +455,59 @@ void testApp::guiEvent(ofxUIEventArgs &e){
     
     if(name == "INVERT SELECTION"){
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
+        bInvertSelection = t->getValue();
     }
-
     
     if(name == "LOAD IMGS"){
+        cout<<"Im in load images"<<endl;
         ofxUIToggle* t  = (ofxUIToggle*) e.widget;
         if (t->getValue()) {
             ofFileDialogResult result = ofSystemLoadDialog("Load Images From Folder", true, "Images/");
-            //cout<<result.filePath<<endl;
             
             if(result.bSuccess && result.fileName.length())
             {
                 loadImagesFromPath(result.filePath);
             }
-
+            
             mLoadImages = false;
             t->setValue(false);
-
+            
         }
         
     }
-    if(name == "UPDATE MARCHING CUBES"){
-        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
-        if(!bTriangulate && t->getValue()){
-            updateResolution();
-            updateMarchingCubes();
-            t->setValue(false);
-        }
-
-    }
-    if(name == "INVERT SELECTION"){
-        ofxUIToggle* t  = (ofxUIToggle*) e.widget;
-        bInvertSelection = t->getValue();
-    }
 }
+
 //--------------------------------------------------------------
 void testApp::loadImagesFromPath(string filePath){
     cout<<filePath<<endl;
     imgs.clear();
-
+    
     ofDirectory dir(filePath);
     dir.listDir();
     if(dir.exists()){
         int size = dir.size();
         vector<ofFile>files= dir.getFiles();
         cout<<size<<endl;
-
         
-        //for(int i=0; i<size; i++){
-            for(int i=0; i<files.size(); i++){
-                cout<<files[i].getFileName()<<endl;
-                ofImage img;
-                img.loadImage(filePath + "/"+files[i].getFileName());
-                imgs.push_back(img);
-                
-            }
-        //}
-
+        for(int i=0; i<files.size(); i++){
+            cout<<files[i].getFileName()<<endl;
+            ofImage img;
+            img.loadImage(filePath + "/"+files[i].getFileName());
+            imgs.push_back(img);
+        }
     }
     else{
         cout<<"directory doesnt exist"<<endl;
     }
     
-
+    
     updateResolution();
-
+    
 }
 //--------------------------------------------------------------
 void testApp::update(){
     
-
+    
     if(mRunTracers){
         cout<<"run"<<endl;
         mModel.update();
@@ -525,13 +542,7 @@ void testApp::update(){
     
     
     if(mUseMC){
-        if (bTriangulate) {
-            //        updateTraingulation();
-        }
-        else{
-            mc.update();
-        }
-
+        mc.update();
     }
     
     
@@ -541,21 +552,22 @@ void testApp::draw(){
 	ofBackgroundGradient(ofColor(64), ofColor(0));
     ofSetColor(255, 255, 255);
     camera.begin();
-
+    
     if(mUseMC){
-        if(bTriangulate){
-            ofPushStyle();
-            normalShader.begin();
-            bWireframe?  ofNoFill(): ofFill();
-            triangulation.draw();
-            normalShader.end();
-            ofPopStyle();
-        }
-        else{
-            normalShader.begin();
+        if(bMarchingCubes){
+            shader.begin();
             bWireframe?	mc.drawWireframe() : mc.draw();
             //draw the voxel grid           if(drawGrid)mc.drawGrid();
-            normalShader.end();
+            shader.end();
+        }
+        
+        if(bTriangulate){
+            ofPushStyle();
+            shader.begin();
+            bWireframe?  ofNoFill(): ofFill();
+            triangulation.draw();
+            shader.end();
+            ofPopStyle();
         }
     }
     
@@ -566,7 +578,7 @@ void testApp::draw(){
         ofPolyline3D n1 = *curSel;
         ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
         n.draw();
-
+        
     }
     
     if(mShowStencils){
@@ -597,10 +609,9 @@ void testApp::draw(){
     }
     if(mShowTracerMesh){
         ofSetColor(200,127);
-      //  normalShader.begin();
-        mTracerMesh.draw();
-       // normalShader.end();
+        mTracerMesh.drawWireframe();
     }
+    
     
     
     
@@ -648,9 +659,13 @@ void testApp::keyPressed(int key){
     }
     if(key =='h'){
         gui->toggleVisible();
+        guiMC->toggleVisible();
+        guiT->toggleVisible();
     }
     if(key =='r'){
         gui->toggleMinified();
+        guiMC->toggleMinified();
+        guiT->toggleMinified();
     }
     if(key ==OF_KEY_DOWN){
         mc.threshold -= .03;
@@ -690,7 +705,7 @@ void testApp::updateMarchingCubes(){
                 if(c.getHue()>0.){
                     value = (c.getHue()/255);
                     value =1;
-                    mc.setIsoValue( i, j, k, value * value );
+                    mc.setIsoValue( i, j, k, isoValue * isoValue );
                 }
                 else{
                     
@@ -741,9 +756,9 @@ vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
     vector<vector<cv::Point> > points = mContourFinder.getContours();
     
     if (points.size() > 0) {
-     //   for(int i =0;i<mContourFinder.getContours().size();i++){
-            for(int i =0;i<points.size();i++){
-
+        //   for(int i =0;i<mContourFinder.getContours().size();i++){
+        for(int i =0;i<points.size();i++){
+            
             ofPolyline line;
             for(int j = 0; j<points[i].size()-2;j++){
                 ofVec3f pos;
@@ -757,11 +772,11 @@ vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
             
             ofPolyline3D n1 = ofPolyline3D();
             //n1.mWorldCenter = ofVec3f(line.getCentroid2D().x,line.getCentroid2D().y,0);
-
+            
             line.close();
             
             ofVec3f center = ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
-                
+            
             for(int i=0;i<line.getVertices().size();i++){
                 ofVec3f diff = line.getVertices()[i] - center;
                 line.getVertices()[i] = diff;
@@ -773,7 +788,7 @@ vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
             contours.push_back(n);
         }
     }
-        return contours;
+    return contours;
 }
 
 void testApp::saveToObj(){
@@ -781,14 +796,18 @@ void testApp::saveToObj(){
         cout<<"saving triangulated obj!"<<endl;
         ofxObjLoader::save("TriangulatedObject_" + ofGetTimestampString()+".obj", triangulation.triangleMesh);
     }
+    else if (mUseTracers){
+        cout<<"saving tracer obj!"<<endl;
+        ofxObjLoader::save("TracerObject_" + ofGetTimestampString()+".obj", mTracerMesh);
+    }
     else{
         
         cout<<"saving marching cube obj!"<<endl;
         mc.exportObj("MarchinCubesObject_"+ofGetTimestampString());
-
+        
     }
-
-
+    
+    
 }
 //--------------------------------------------------------------
 void testApp::keyReleased(int key){
@@ -806,11 +825,8 @@ void testApp::mouseMoved(int x, int y ){
 
 //--------------------------------------------------------------
 void testApp::mouseDragged(int x, int y, int button){
- 
+    
     ofVec2f mouse(x,y);
-    
-    
-    
     
     //rotate camera
     if(mouse.x > ofGetWidth()-200 && mouse.y > ofGetHeight()-200){
@@ -819,22 +835,21 @@ void testApp::mouseDragged(int x, int y, int button){
         float scaledY = ofMap(y, ofGetHeight()-200,ofGetHeight(), 0, TWO_PI);
         float lastScaledX = ofMap(mLastMouse.x, ofGetWidth()-200,ofGetWidth(), 0, TWO_PI);
         float lastScaledY = ofMap(mLastMouse.y, ofGetHeight()-200,ofGetHeight(), 0, TWO_PI);
-
+        
         ofQuaternion yRot((mouse.x - mLastMouse.x)*mRotDampen, ofVec3f(0,1,0));
         ofQuaternion xRot((mouse.y - mLastMouse.y)*mRotDampen, ofVec3f(-1,0,0));
         mMasterRotation *= yRot*xRot;
-       // camera.setOrientation(mMasterRotation);
+        // camera.setOrientation(mMasterRotation);
         ofVec3f axis;
         float angle;
         mMasterRotation.getRotate(angle, axis);
-        for(int i=0;i<curSel->getVertices().size();i++){
-            curSel->getVertices()[i] = curSel->getVertices()[i].rotated(angle, axis);
+        if(bContours){
+            for(int i=0;i<curSel->getVertices().size();i++){
+                curSel->getVertices()[i] = curSel->getVertices()[i].rotated(angle, axis);
+            }
         }
-        
     }
-    
     mLastMouse = mouse;
-
 }
 
 //--------------------------------------------------------------
@@ -861,5 +876,4 @@ void testApp::gotMessage(ofMessage msg){
 void testApp::dragEvent(ofDragInfo dragInfo){
     
 }
-
 
