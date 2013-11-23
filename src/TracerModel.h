@@ -16,6 +16,8 @@ public:
     void reset();
     ofPolyline3D getSlice( int &ID );
     
+    ofPolyline mPath;
+    
 private:
     vector<ofPolyline3D> slices;
 };

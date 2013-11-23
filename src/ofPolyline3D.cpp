@@ -31,6 +31,16 @@ ofPolyline3D ofPolyline3D::convertToPolyline3D(ofPolyline &p, ofPolyline3D &newP
     return newPoly;
 }
 
+ofVec3f ofPolyline3D::get3DCenter(){
+    ofVec3f center;
+    center.x = getCentroid2D().x;
+    center.y = getCentroid2D().y;
+    center.z = 0.f;
+    center = center * mRotation;
+    center += mWorldCenter;
+    return center;
+}
+
 void ofPolyline3D::draw(){
     ofPushMatrix();
     ofTranslate(mWorldCenter);

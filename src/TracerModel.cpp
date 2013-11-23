@@ -30,7 +30,15 @@ void TracerModel::set( Stencil* stencil, const int &numTracers ){
         }
     
     for (int i=0;i<mTargets.size();i++) {
-        mTracers.push_back(new Tracer( mTargets[i],mBase.getWorldLocation(i), i));
+        ofVec3f closest;
+        float d = 10000000000;
+        for(int j=0;j<mBase.getVertices().size();j++){
+            if(mTargets[i].distance(mBase.getWorldLocation(j))<d){
+               closest = mBase.getWorldLocation(j);
+                d = mTargets[i].distance(mBase.getWorldLocation(j));
+            }
+        }
+        mTracers.push_back(new Tracer( mTargets[i],closest, i));
     }
     
 }
@@ -138,6 +146,12 @@ bool Stencil::hasSlices(){
 
 void Stencil::setSlice(ofPolyline3D poly){
     slices.push_back(poly);
+    if(slices.size()>1){
+        mPath.clear();
+        for(int i=0;i<slices.size();i++){
+        mPath.addVertex(slices[i].get3DCenter());
+        }
+    }
 }
 
 void Stencil::removeSlice(int &ID){
@@ -147,8 +161,11 @@ void Stencil::removeSlice(int &ID){
 
 void Stencil::draw(){
     for(int i=0;i<slices.size();i++){
+        ofSetColor(0, 0, 255);
         slices[i].draw();
     }
+    ofSetColor(255, 255, 127);
+    mPath.draw();
 }
 
 vector<ofPolyline3D> Stencil::getSlices(){
@@ -157,5 +174,6 @@ vector<ofPolyline3D> Stencil::getSlices(){
 
 void Stencil::reset(){
     slices.clear();
+    mPath.clear();
 }
 

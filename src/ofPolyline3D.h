@@ -11,6 +11,7 @@ public:
     void draw();
     ofVec3f getWorldLocation(int &i);
     ofVec3f getLocalLocation(int &i);
+    ofVec3f get3DCenter();
     ofMatrix4x4 mRotation;
     ofVec3f mWorldCenter;
 

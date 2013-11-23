@@ -23,6 +23,7 @@ void testApp::setup(){
     mShowSelection = false;
     mEnableSelection = false;
     mShowTracerMesh = false;
+    bRotSel = false;
     isoValue = 1;
     
     bInvertSelection = false;
@@ -32,12 +33,12 @@ void testApp::setup(){
     
     mNumTracers = 100;
     
-    for(int i=0; i<13; i++){
+   // for(int i=0; i<13; i++){
         ofImage img;
-        img.loadImage("Images/hands/"+ofToString(i)+".png");
+        img.loadImage("Images/face/"+ofToString(0)+".png");
         imgs.push_back(img);
         
-    }
+    //}
     mc.setup();
     cubeResolution = 32;
 	mc.scale.set( 500, 250, 500 );
@@ -108,7 +109,6 @@ void testApp::setupGUIMC(){
     float length = 255-xInit;
     guiMC = new ofxUISuperCanvas("MARCHING CUBES", length+xInit+2, 0, length+xInit, ofGetHeight()/2);
     guiMC->addSpacer();
-    guiMC->addToggle("SAVE OBJ",&mSaveObj);
     guiMC->addToggle("INVERT SELECTION", &bInvertSelection);
     guiMC->addToggle("DRAW MC", &bMarchingCubes);
     guiMC->addToggle("DRAW TRIANGULATION", &bTriangulate);
@@ -116,8 +116,8 @@ void testApp::setupGUIMC(){
     guiMC->addSpacer();
     guiMC->addLabel("TRIANGULATION PARAMS");
     guiMC->addSpacer();
-    guiMC->addIntSlider("RES X", 1, 20, &triResX);
-    guiMC->addIntSlider("RES Y", 1, 20, &triResY);
+    guiMC->addIntSlider("RES X", 1, ofGetWidth(), &triResX);
+    guiMC->addIntSlider("RES Y", 1, ofGetHeight(), &triResY);
     guiMC->addIntSlider("RES Z", 10, 500, &triResZ);
     guiMC->addSpacer();
     guiMC->addLabel("MC PARAMS");
@@ -165,7 +165,8 @@ void testApp::setupGUITracers(){
     guiT->addDropDownList("CHOOSE OBS TYPE", items, 200);
     guiT->addToggle("ENABLE OBS", false);
     guiT->addToggle("HIDE OBS", &bShowObs);
-    
+    guiT->autoSizeToFitWidgets();
+
     
     
     
@@ -204,6 +205,9 @@ void testApp::setupGUI(){
     gui->addSpacer();
     gui->addToggle("NORMAL SHADER", false);
     gui->addToggle("FR SHADER", false);
+    gui->addSpacer();
+    gui->addToggle("SAVE OBJ",&mSaveObj);
+
     
     ofAddListener(gui->newGUIEvent, this, &testApp::guiEvent);
     
@@ -214,20 +218,18 @@ void testApp::setupGUI(){
 void testApp::createBase(){
     
     vector<ofPolyline3D> tmp;
-    ofRectangle rect = ofRectangle(-100, -100, 200, 200);
     ofPolyline3D base;
-    base.addVertex(rect.getTopLeft());
-    base.addVertex(rect.getTopRight());
-    base.addVertex(rect.getBottomRight());
-    base.addVertex(rect.getBottomLeft());
-    base.close();
+    for(int i=0;i<100;i++){
+        float angle = ofMap(i,0,100,0,TWO_PI);
+        base.addVertex(ofVec3f(cos(angle), sin(angle), 0));
+    }
     tmp.push_back(base);
     
     ofPolyline3D base2;
     
     for(int i=0;i<100;i++){
         float angle = ofMap(i,0,100,0,TWO_PI);
-        base2.addVertex(ofVec3f(100*cos(angle), 100*sin(angle), -500));
+        base2.addVertex(ofVec3f(100*cos(angle), 100*sin(angle), 0));
     }
     base2.close();
     tmp.push_back(base2);
@@ -284,6 +286,7 @@ void testApp::guiEvent(ofxUIEventArgs &e){
             t->setValue(false);
         }
     }
+    
     if(name=="ATTRACTOR")curObs->setType(ATTRACTOR);
     if(name=="REPELLER")curObs->setType(REPELLER);
     if(name=="NOISEDRAG")curObs->setType(NOISEDRAG);
@@ -578,7 +581,20 @@ void testApp::draw(){
         ofPolyline3D n1 = *curSel;
         ofPolyline3D n = ofPolyline3D::convertToPolyline3D(p, n1);
         n.draw();
-        
+        ofPushMatrix();
+        ofVec3f axis;
+        float angle;
+        n.mRotation.getRotate().getRotate(angle, axis);
+        ofTranslate(n.mWorldCenter);
+        ofRotate(angle, axis.x, axis.y, axis.z);
+        ofSetColor(255,255,0,30);
+        ofCircle(0,0,0, n.getBoundingBox().getWidth()/2<20 ? 20 : n.getBoundingBox().getWidth()/2);
+        ofSetColor(0,0,255,30);
+        ofPushMatrix();
+        ofRotateY(90);
+        ofCircle(0,0,0, n.getBoundingBox().getWidth()/2<20 ? 20 : n.getBoundingBox().getWidth()/2 );
+        ofPopMatrix();
+        ofPopMatrix();
     }
     
     if(mShowStencils){
@@ -630,7 +646,6 @@ void testApp::draw(){
 	ofRotate(angle, axis.x, axis.y, axis.z);
     ofNoFill();
     ofSetColor(255, 175);
-    ofRect(-50,-50,100,100);
 	ofSphere(0, 0, 0, 30);
 	ofPopMatrix();
     
@@ -689,6 +704,8 @@ void testApp::keyPressed(int key){
     if(key =='s'){
         saveToObj();
     }
+    
+    if(key =='t')bRotSel = true;
     
 }
 
@@ -760,22 +777,24 @@ vector<ofPolyline3D> testApp::getImageContours( ofImage &image){
         for(int i =0;i<points.size();i++){
             
             ofPolyline line;
+            float zAvg = 0;
             for(int j = 0; j<points[i].size()-2;j++){
                 ofVec3f pos;
                 ofColor ptColor = image.getColor(points[i][j].x, points[i][j].y);
                 float hue = ptColor.getHue();
                 //change the 0 500 for scale
                 pos = ofVec3f(points[i][j].x,points[i][j].y,ofMap(hue,0,255,0,500));
-                
+                zAvg += pos.z;
                 line.addVertex(pos);
             }
             
             ofPolyline3D n1 = ofPolyline3D();
             //n1.mWorldCenter = ofVec3f(line.getCentroid2D().x,line.getCentroid2D().y,0);
-            
             line.close();
+            zAvg/=line.getVertices().size();
+
             
-            ofVec3f center = ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, 0);
+            ofVec3f center = ofVec3f(line.getCentroid2D().x, line.getCentroid2D().y, zAvg);
             
             for(int i=0;i<line.getVertices().size();i++){
                 ofVec3f diff = line.getVertices()[i] - center;
@@ -809,6 +828,7 @@ void testApp::saveToObj(){
     
     
 }
+
 //--------------------------------------------------------------
 void testApp::keyReleased(int key){
     if(key=='q'){
@@ -816,6 +836,7 @@ void testApp::keyReleased(int key){
         mEnableSelection = false;
     }
     if(key=='r')mRunTracers = !mRunTracers;
+    if(key == 't')bRotSel = false;
 }
 
 //--------------------------------------------------------------
@@ -829,25 +850,23 @@ void testApp::mouseDragged(int x, int y, int button){
     ofVec2f mouse(x,y);
     
     //rotate camera
-    if(mouse.x > ofGetWidth()-200 && mouse.y > ofGetHeight()-200){
+  //  if(mouse.x > ofGetWidth()-200 && mouse.y > ofGetHeight()-200){
         
-        float scaledX = ofMap(x, ofGetWidth()-200,ofGetWidth(), 0, TWO_PI);
-        float scaledY = ofMap(y, ofGetHeight()-200,ofGetHeight(), 0, TWO_PI);
-        float lastScaledX = ofMap(mLastMouse.x, ofGetWidth()-200,ofGetWidth(), 0, TWO_PI);
-        float lastScaledY = ofMap(mLastMouse.y, ofGetHeight()-200,ofGetHeight(), 0, TWO_PI);
+    //    float scaledX = ofMap(x, ofGetWidth()-200,ofGetWidth(), 0, ofGetWidth());
+     //   float scaledY = ofMap(y, ofGetHeight()-200,ofGetHeight(), 0, ofGetHeight());
+     //   float lastScaledX = ofMap(mLastMouse.x, ofGetWidth()-200,ofGetWidth(), 0, ofGetWidth());
+    //    float lastScaledY = ofMap(mLastMouse.y, ofGetHeight()-200,ofGetHeight(), 0, ofGetHeight());
         
         ofQuaternion yRot((mouse.x - mLastMouse.x)*mRotDampen, ofVec3f(0,1,0));
         ofQuaternion xRot((mouse.y - mLastMouse.y)*mRotDampen, ofVec3f(-1,0,0));
-        mMasterRotation *= yRot*xRot;
         // camera.setOrientation(mMasterRotation);
-        ofVec3f axis;
-        float angle;
-        mMasterRotation.getRotate(angle, axis);
-        if(bContours){
-            for(int i=0;i<curSel->getVertices().size();i++){
-                curSel->getVertices()[i] = curSel->getVertices()[i].rotated(angle, axis);
-            }
-        }
+//        ofVec3f axis;
+//        float angle;
+//        mMasterRotation.getRotate(angle, axis);
+        if(mShowSelection && bRotSel ){
+            mMasterRotation = yRot*xRot*curSel->mRotation.getRotate();
+            curSel->mRotation.setRotate(mMasterRotation);
+  
     }
     mLastMouse = mouse;
 }

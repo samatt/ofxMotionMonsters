@@ -72,6 +72,7 @@ class testApp : public ofBaseApp{
         bool mAddContour;
         bool mShowSelection;
         bool mShowTracerMesh;
+        bool bRotSel;
     
         ofVec3f mContInd;
         ofVec3f mContIndSet;
